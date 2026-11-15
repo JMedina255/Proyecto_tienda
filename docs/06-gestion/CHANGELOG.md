@@ -6,6 +6,29 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [0.0.6] - 2026-11-15 (Hito H02 — Arquitectura del Sistema y Estrategia Offline-First)
+
+### Añadido
+- **Consolidación del Documento de Arquitectura (`docs/02-arquitectura/ARQUITECTURA.md`):**
+  - Diagrama general de arquitectura en Mermaid con capas del cliente móvil Android, canal seguro TLS 1.3, backend Supabase y panel web administrativo.
+  - Especificación formal de la organización del Monorepo con `pnpm workspaces` y `Turborepo` (`apps/mobile`, `apps/web`, `packages/shared-types`, `packages/business-logic`, `packages/database`, `packages/sync-engine`).
+  - Arquitectura móvil por módulos funcionales (*feature-based*) con separación estricta entre presentación (UI), hooks, servicios de dominio y repositorios de persistencia.
+  - Integración técnica detallada con Supabase: GoTrue Auth (sesión persistida en Android Keystore con `expo-secure-store`, expiración offline tras 7 días), PostgreSQL con RLS y RPCs transaccionales (`rpc_push_mutations`, `rpc_pull_deltas`), y buckets de Supabase Storage para archivos multimedia.
+  - Pipeline de medios y captura asistida: almacenamiento local inmediato en sandbox, inferencia OCR on-device con Google ML Kit (`@react-native-ml-kit/text-recognition`) en <300ms, y subida asíncrona desacoplada (`PhotoUploadWorker`).
+  - Estrategia integral de sincronización offline con patrón Outbox, idempotencia basada en UUID v4 y claves hash (`idempotency_key`), backoff exponencial con jitter y modelo de Libro Mayor Append-Only (aditivo e inmutable) que veta *Last-Write-Wins* en ventas, cobros y caja.
+  - Protocolo de cierres de caja provisionales offline y conciliación contable en servidor (`DEC-007`, `RN-CAJ-004`).
+  - Diagramas de secuencia esenciales: ciclo de sincronización Outbox e idempotencia, y conciliación de cierres de caja provisorios.
+  - Matriz de evaluación tecnológica y recomendaciones justificadas para `DEC-012`, `DEC-013`, `DEC-014` y `DEC-015`.
+- **Registro de Decisiones Arquitectónicas (`docs/06-gestion/DECISIONES.md`):**
+  - Actualización de `DEC-012` (Recomendación: Outbox sobre `expo-sqlite`), `DEC-013` (Recomendación: Solución Híbrida con Google ML Kit on-device), `DEC-014` (Recomendación: pnpm + Turborepo) y `DEC-015` (Recomendación: Cifrado Híbrido con Keystore y campos sensibles), manteniéndolas en estado `Propuesto (Recomendado en H02)` sin confirmación arbitraria.
+
+### Cambiado
+- **Actualización de Gobernanza y Planificación:**
+  - `docs/05-planificacion/PLAN_DESARROLLO.md`: Registro de H02 como completado y activación de H03 (Modelo y Diccionario de Datos).
+  - `docs/README.md` y `README.md`: Actualización del estado de avance hacia el hito H03.
+
+---
+
 ## [0.0.5] - 2026-11-15 (Hito H01.1 — Simplificación y Normalización Documental)
 
 ### Añadido

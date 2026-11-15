@@ -2,7 +2,7 @@
 
 **Proyecto:** Sistema de Gestión de Librería — Proyecto Tienda<br>
 **Documento:** PLAN_DESARROLLO.md<br>
-**Estado:** Actualizado en H01.1<br>
+**Estado:** Actualizado en H02<br>
 **Trazabilidad:** [../01-requerimientos/SRS.md](../01-requerimientos/SRS.md) | [../06-gestion/DECISIONES.md](../06-gestion/DECISIONES.md)
 
 ---
@@ -19,8 +19,8 @@ flowchart TD
     H00_1 --> H00_2["H00.2: Configuración Git y Política\n(Completado)"]
     H00_2 --> H01["H01: Especificación Detallada SRS\ny Reglas de Negocio (Completado)"]
     H01 --> H01_1["H01.1: Simplificación y Normalización\nDocumental (Completado)"]
-    H01_1 --> H02["H02: Arquitectura del Sistema\ny Sincronización Offline (Hito Activo)"]
-    H02 --> H03["H03: Modelo y Diccionario\nde Datos Relacional"]
+    H01_1 --> H02["H02: Arquitectura del Sistema\ny Sincronización Offline (Completado)"]
+    H02 --> H03["H03: Modelo y Diccionario\nde Datos Relacional (Hito Activo)"]
     H03 --> H04["H04: Estándares de Programación\ny Hardening de Seguridad"]
     H04 --> H05["H05: Planificación Técnica,\nPruebas y Criterios"]
     H05 --> H06["H06: Preparación del Monorepo\ne Inicio de Implementación (Gate)"]
@@ -99,28 +99,27 @@ A partir de H00.2, cada hito completado tiene como entregable mandatorio:
 ---
 
 ### Hito H02: Arquitectura del Sistema y Sincronización Offline
-- **Objetivo:** Detallar el diseño de arquitectura técnica, resolver las decisiones técnicas pendientes de sincronización y OCR, y especificar el motor de replicación asíncrono.
+- **Objetivo:** Detallar el diseño de arquitectura técnica, evaluar y recomendar las decisiones técnicas de sincronización, OCR, monorepo y cifrado local, y especificar el motor de replicación asíncrono con reglas financieras anti-LWW.
 - **Dependencias:** H01.1.
 - **Entregables:**
-  - Resolución formal de `DEC-012` (motor de sincronización: PowerSync vs. WatermelonDB vs. Outbox propietario).
-  - Resolución formal de `DEC-013` (tecnología OCR: Google ML Kit on-device vs. cloud).
-  - Resolución formal de `DEC-014` (orquestador monorepo Turborepo + pnpm).
-  - Especificación de protocolos de sincronización, colas Outbox, estructura de payloads JSON y algoritmos deterministas de reconciliación.
-  - Diagramas de secuencia detallados de recuperación de conexión y sincronización bidireccional.
+  - Evaluación comparativa y recomendaciones para `DEC-012` (Outbox con `expo-sqlite`), `DEC-013` (Solución Híbrida con Google ML Kit on-device), `DEC-014` (pnpm Workspaces + Turborepo) y `DEC-015` (Cifrado Híbrido con Keystore y campos sensibles).
+  - Actualización exhaustiva de [ARQUITECTURA.md](../02-arquitectura/ARQUITECTURA.md) con organización del monorepo, arquitectura móvil modular, integración con Supabase (Auth, Postgres, Storage), persistencia SQLite (WAL mode), pipeline de medios/OCR, y estrategia de sincronización offline con modelo de libro mayor append-only.
+  - Diagrama de arquitectura general y diagramas de secuencia esenciales (ciclo Outbox e idempotencia; conciliación de caja provisoria offline).
   - **Entregable Git:** Commit `docs(h02): arquitectura y estrategia offline` y push a `origin/master`.
-- **Criterios de Aceptación:** Arquitectura offline-first completamente validada con pruebas de concepto documentadas.
-- **Estado:** **Hito Activo / Próximo hito.**
+- **Criterios de Aceptación:** Arquitectura offline-first completamente validada con trazabilidad técnica y decisiones técnicas formalmente registradas.
+- **Estado:** **Completado.**
 
 ---
 
 ### Hito H03: Modelo y Diccionario de Datos
 - **Objetivo:** Consolidar el modelo relacional definitivo y completar el diccionario de datos exhaustivo para SQLite y PostgreSQL.
-- **Dependencias:** H01, H02.
+- **Dependencias:** H01.1, H02.
 - **Entregables:**
   - Esquema relacional definitivo en [MODELO_DATOS.md](../02-arquitectura/MODELO_DATOS.md) con todas las entidades normalizadas.
   - Catálogo completo de tablas, columnas, tipos de datos, nulabilidad, restricciones `CHECK`, claves foráneas e índices en [DICCIONARIO_DATOS.md](../03-estandares/DICCIONARIO_DATOS.md).
   - Estrategia de migraciones versionadas y scripts DDL preliminares.
 - **Criterios de Aceptación:** Coherencia de tipos entre SQLite y PostgreSQL para el 100% de las tablas y campos del sistema.
+- **Estado:** **Hito Activo / Próximo hito.**
 
 ---
 
