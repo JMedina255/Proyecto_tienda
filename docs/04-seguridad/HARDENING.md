@@ -2,7 +2,7 @@
 
 **Proyecto:** Sistema de Gestión de Librería — Proyecto Tienda  
 **Documento:** HARDENING.md  
-**Estado:** Línea base preliminar establecida (Hito H00)  
+**Estado:** Actualizado en H02.1<br>
 **Trazabilidad:** [../01-requerimientos/SRS.md](../01-requerimientos/SRS.md) | [../02-arquitectura/ARQUITECTURA.md](../02-arquitectura/ARQUITECTURA.md) | [../../AGENTS.md](../../AGENTS.md)
 
 ---
@@ -50,7 +50,10 @@ Para garantizar máxima honestidad técnica y auditoría rigurosa, cada control 
   - **Estado:** `Pendiente` (Fase objetivo: H01).
 - **SEC-AUTHZ-003 (Autorización en dos pasos para entregas con saldo):**
   - Toda venta con entrega física y saldo pendiente debe requerir la validación de credenciales (PIN o reautenticación) del Dueño o Administrador antes de consolidarse (ref: [RN-PAG-002](../01-requerimientos/REGLAS_NEGOCIO.md#rn-pag-002-autorización-obligatoria-para-entregas-con-saldo-pendiente)).
-  - **Estado:** `Pendiente` (Fase objetivo: H04).
+  - **Estado:** `Pendiente` (Fase objetivo: H04 / H08).
+- **SEC-AUTHZ-004 (Autorización offline de operaciones sensibles, revocación y auditoría):**
+  - Toda autorización offline de supervisor (fiados, anulaciones) debe incluir caducidad de credenciales locales en caché, sincronización obligatoria de lista de revocación local (Local CRL) al conectar, y registro inmutable en auditoría (`autorizador_id`, `dispositivo_id`, `timestamp_local`, firma HMAC) validado por el servidor al sincronizar.
+  - **Estado:** `Pendiente` (Fase objetivo: H04 / H06).
 
 ---
 
@@ -115,19 +118,23 @@ Para garantizar máxima honestidad técnica y auditoría rigurosa, cada control 
 - **SEC-SYNC-002 (Prevención de ataques de repetición - Replay Protection):**
   - Cada mutación en la cola Outbox debe contener un UUID único y una marca de tiempo UTC monotónica. El servidor rechazará transacciones con identificadores duplicados ya procesados.
   - **Estado:** `Pendiente` (Fase objetivo: H06).
+- **SEC-SYNC-003 (Seguridad y mínimo privilegio en funciones RPC de Supabase):**
+  - Las funciones de sincronización en Supabase deben priorizar `SECURITY INVOKER` para evaluar políticas RLS. Si se requiere `SECURITY DEFINER` para auditoría de idempotencia (`sync_processed_mutations`), deben fijar `SET search_path = public, pg_temp;`, verificar obligatoriamente `auth.uid() IS NOT NULL`, validar roles y revocar privilegios a `PUBLIC`.
+  - **Estado:** `Pendiente` (Fase objetivo: H04 / H06).
 
 ---
 
 ## 3. Matriz de Controles de Seguridad
 
 | ID de Control | Dominio | Descripción Resumida | Estado Actual | Fase de Especificación | Fase de Implementación |
-| :--- | :--- | :--- | :---: | :---: | :---: |
+| :--- | :--- | :--- | :--- | :---: | :---: |
 | `SEC-AUTH-001` | Autenticación | GoTrue JWT + refresh tokens | **Pendiente** | H04 | H06 |
 | `SEC-AUTH-002` | Autenticación | Almacenamiento en Keystore (`SecureStore`) | **Pendiente** | H04 | H06 |
 | `SEC-AUTH-003` | Autenticación | Invalidación local y remota de sesión | **Pendiente** | H04 | H06 |
 | `SEC-AUTHZ-001`| Autorización | RLS en 100% de tablas PostgreSQL | **Pendiente** | H04 | H06 |
 | `SEC-AUTHZ-002`| Autorización | RBAC (Admin, Dueño, Vendedor) | **Pendiente** | H04 | H06 |
 | `SEC-AUTHZ-003`| Autorización | Doble factor/PIN para autorización de fiados | **Pendiente** | H04 | H08 |
+| `SEC-AUTHZ-004`| Autorización | Autorización offline con caducidad y auditoría | **Pendiente** | H04 | H06 |
 | `SEC-DATA-001` | Datos Locales| Cifrado de base de datos SQLite en reposo | **Pendiente** | H04 | H06 |
 | `SEC-DATA-002` | Datos Locales| Aislamiento en sandbox de la app | **Pendiente** | H04 | H06 |
 | `SEC-DATA-003` | Datos Locales| Purgado de temporales de cámara y OCR | **Pendiente** | H04 | H07 |
@@ -139,5 +146,6 @@ Para garantizar máxima honestidad técnica y auditoría rigurosa, cada control 
 | `SEC-SECR-002` | Secretos | Exclusión de `service_role key` en móvil | **Pendiente** | H04 | H06 |
 | `SEC-AUD-001`  | Auditoría | Inmutabilidad de registros financieros | **Pendiente** | H04 | H06 |
 | `SEC-AUD-002`  | Auditoría | Bitácora de autorizaciones y anulaciones | **Pendiente** | H04 | H08 |
-| `SEC-SYNC-001` | Sincronización| Validación de mutaciones en servidor | **Pendiente** | H04 | H10 |
-| `SEC-SYNC-002` | Sincronización| Protección contra ataques de repetición | **Pendiente** | H04 | H10 |
+| `SEC-SYNC-001` | Sincronización| Validación de mutaciones en servidor | **Pendiente** | H04 | H06 |
+| `SEC-SYNC-002` | Sincronización| Protección contra ataques de repetición | **Pendiente** | H04 | H06 |
+| `SEC-SYNC-003` | Sincronización| Mínimo privilegio y RLS en funciones RPC | **Pendiente** | H04 | H06 |

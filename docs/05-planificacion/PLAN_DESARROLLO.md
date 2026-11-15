@@ -2,7 +2,7 @@
 
 **Proyecto:** Sistema de Gestión de Librería — Proyecto Tienda<br>
 **Documento:** PLAN_DESARROLLO.md<br>
-**Estado:** Actualizado en H02<br>
+**Estado:** Actualizado en H02.1<br>
 **Trazabilidad:** [../01-requerimientos/SRS.md](../01-requerimientos/SRS.md) | [../06-gestion/DECISIONES.md](../06-gestion/DECISIONES.md)
 
 ---
@@ -20,11 +20,12 @@ flowchart TD
     H00_2 --> H01["H01: Especificación Detallada SRS\ny Reglas de Negocio (Completado)"]
     H01 --> H01_1["H01.1: Simplificación y Normalización\nDocumental (Completado)"]
     H01_1 --> H02["H02: Arquitectura del Sistema\ny Sincronización Offline (Completado)"]
-    H02 --> H03["H03: Modelo y Diccionario\nde Datos Relacional (Hito Activo)"]
+    H02 --> H02_1["H02.1: Correcciones Críticas\nde Arquitectura (Completado)"]
+    H02_1 --> H03["H03: Modelo y Diccionario\nde Datos Relacional (Hito Activo)"]
     H03 --> H04["H04: Estándares de Programación\ny Hardening de Seguridad"]
     H04 --> H05["H05: Planificación Técnica,\nPruebas y Criterios"]
-    H05 --> H06["H06: Preparación del Monorepo\ne Inicio de Implementación (Gate)"]
-    H06 -.-> H07["H07+: Desarrollo Iterativo de\nMódulos (Móvil, Web, Fiscal)"]
+    H05 --> H06["H06: Preparación del Monorepo,\nPersistencia e Infraestructura Sync (Gate)"]
+    H06 -.-> H07["H07+: Desarrollo Iterativo de\nMódulos sobre Capa Sync Base"]
 ```
 
 ### 1.1 Entregables de Control de Versiones Git por Hito
@@ -111,9 +112,23 @@ A partir de H00.2, cada hito completado tiene como entregable mandatorio:
 
 ---
 
+### Hito H02.1: Correcciones Críticas de Arquitectura
+- **Objetivo:** Subsanar los riesgos técnicos identificados en H02: evaluar durabilidad SQLite WAL (`synchronous = FULL` para finanzas), blindar funciones RPC frente a bypass de RLS, reordenar la secuencia de hitos para que la infraestructura de sincronización preceda a ventas y caja, documentar requerimientos nativos de Google ML Kit (Expo Dev Client y empaquetado offline), sustituir afirmaciones de rendimiento por metas sujetas a pruebas, mantener como propuestas pendientes el período de gracia de 7 días y la exclusividad de caja por terminal, y especificar la autorización offline de operaciones sensibles con caducidad y auditoría.
+- **Dependencias:** H02.
+- **Entregables:**
+  - `ARQUITECTURA.md` corregido con durabilidad WAL diferenciada, RPCs seguras, modelo ML Kit empaquetado y autorización offline auditable.
+  - `DECISIONES.md` con riesgos y mitigaciones para `DEC-012` a `DEC-015`, y registro formal de `DEC-017` y `DEC-018`.
+  - `HARDENING.md` con controles `SEC-AUTHZ-004` y `SEC-SYNC-003`.
+  - `PLAN_DESARROLLO.md` realineado con la infraestructura base de sincronización en H06.
+  - **Entregable Git:** Commit `docs(h02.1): correcciones criticas de arquitectura` y push a `origin/master`.
+- **Criterios de Aceptación:** Consistencia arquitectónica total, trazabilidad rigurosa y eliminación de riesgos de seguridad y secuencia técnica.
+- **Estado:** **Completado.**
+
+---
+
 ### Hito H03: Modelo y Diccionario de Datos
 - **Objetivo:** Consolidar el modelo relacional definitivo y completar el diccionario de datos exhaustivo para SQLite y PostgreSQL.
-- **Dependencias:** H01.1, H02.
+- **Dependencias:** H01.1, H02, H02.1.
 - **Entregables:**
   - Esquema relacional definitivo en [MODELO_DATOS.md](../02-arquitectura/MODELO_DATOS.md) con todas las entidades normalizadas.
   - Catálogo completo de tablas, columnas, tipos de datos, nulabilidad, restricciones `CHECK`, claves foráneas e índices en [DICCIONARIO_DATOS.md](../03-estandares/DICCIONARIO_DATOS.md).
@@ -125,7 +140,7 @@ A partir de H00.2, cada hito completado tiene como entregable mandatorio:
 
 ### Hito H04: Estándares de Programación y Hardening de Seguridad
 - **Objetivo:** Definir las directrices estrictas de desarrollo, linters, arquitectura de componentes y la especificación detallada de los controles de seguridad.
-- **Dependencias:** H02, H03.
+- **Dependencias:** H02, H02.1, H03.
 - **Entregables:**
   - Reglas de codificación consolidadas en [ESTANDAR_PROGRAMACION.md](../03-estandares/ESTANDAR_PROGRAMACION.md).
   - Resolución formal de `DEC-015` (estrategia de cifrado en reposo para SQLite local).
@@ -148,24 +163,25 @@ A partir de H00.2, cada hito completado tiene como entregable mandatorio:
 
 ---
 
-### Hito H06: Preparación del Monorepo e Inicio de Implementación (Sujeto a Aprobación)
-- **Objetivo:** Inicializar la estructura física del monorepo, tooling de desarrollo, configuración base de TypeScript, paquetes compartidos y cliente base, **únicamente tras la aprobación explícita del usuario**.
+### Hito H06: Preparación del Monorepo, Persistencia e Infraestructura Sync (Sujeto a Aprobación)
+- **Objetivo:** Inicializar la estructura física del monorepo, tooling de desarrollo, persistencia local SQLite e **infraestructura fundacional de sincronización e idempotencia**, como base previa e indispensable antes de desarrollar ventas y tesorería.
 - **Dependencias:** Aprobación formal de H05.
 - **Entregables:**
   - Configuración de `pnpm-workspace.yaml`, `turbo.json` y dependencias de raíz.
   - Inicialización del paquete `@tienda/shared-types` con tipos TypeScript generados.
-  - Inicialización de la aplicación móvil en `apps/mobile` (React Native + Expo).
-  - Configuración de conexión base a SQLite local y cliente Supabase.
-- **Criterios de Aceptación:** Compilación limpia de TypeScript, linters pasando sin advertencias y app móvil arrancando en emulador Android.
+  - Inicialización de la aplicación móvil en `apps/mobile` (React Native + Expo con Dev Client).
+  - Configuración de persistencia local en SQLite (WAL mode, `synchronous = FULL` para finanzas).
+  - **Infraestructura Base de Sincronización e Idempotencia:** Tabla local `sync_outbox`, generador universal de UUIDs v4, generador de claves hash de idempotencia (`idempotency_key`), middleware transaccional y cliente base de comunicación con Supabase RPCs.
+- **Criterios de Aceptación:** Compilación limpia de TypeScript, linters pasando sin advertencias y cola de outbox verificada con pruebas unitarias en emulador Android.
 
 ---
 
 ## 3. Fases Subsiguientes de Desarrollo (H07 en adelante)
 
-Una vez completado el hito H06, la construcción continuará bajo los siguientes hitos de implementación:
-- **H07:** Desarrollo del Core Móvil (Catálogo, Ediciones, Búsquedas y Pipeline OCR).
-- **H08:** Tesorería y Ventas de Mostrador (Caja diaria, Pagos mixtos, Fiados autorizados y Venta rápida).
+Una vez completado el hito H06, la construcción continuará bajo los siguientes hitos de implementación estructurados:
+- **H07:** Core Móvil (Catálogo, Ediciones, Búsquedas y Pipeline OCR On-Device).
+- **H08:** Tesorería y Ventas de Mostrador (Caja diaria, Pagos mixtos, Fiados autorizados y Venta rápida) **construidos nativamente sobre la base de sincronización previa**.
 - **H09:** Abastecimiento y Proveedores (Directorio, Pedidos de libros faltantes, Recepciones y Cuentas por pagar).
-- **H10:** Motor de Sincronización Offline-First y Conciliación de Cierres de Caja.
+- **H10:** Pruebas E2E de Resiliencia Offline, Conciliación de Cierres de Caja y Replicación Bidireccional en Red Inestable.
 - **H11:** Panel Web Administrativo en React (Auditoría, Reportería y Gestión de Usuarios).
 - **H12:** Adaptador de Facturación Electrónica y Release v1.0 para Producción.

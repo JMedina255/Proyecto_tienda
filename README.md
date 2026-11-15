@@ -165,8 +165,8 @@ Toda la documentación técnica y de gestión del proyecto reside en el director
 | Parámetro | Estado |
 | :--- | :--- |
 | **Fase actual** | Fase 1 — Especificación Funcional y Diseño de Arquitectura |
-| **Hito completado recientemente** | **H02 — Arquitectura del sistema y estrategia Offline-First** |
-| **Hitos cerrados** | **H00** (Inicialización), **H00.1** (Auditoría), **H00.2** (Git y versionado), **H01** (SRS y reglas), **H01.1** (Simplificación y normalización), **H02** (Arquitectura y Offline-First) |
+| **Hito completado recientemente** | **H02.1 — Correcciones críticas de arquitectura** |
+| **Hitos cerrados** | **H00** (Inicialización), **H00.1** (Auditoría), **H00.2** (Git y versionado), **H01** (SRS y reglas), **H01.1** (Simplificación y normalización), **H02** (Arquitectura), **H02.1** (Correcciones críticas) |
 | **Repositorio remoto** | [https://github.com/JMedina255/Proyecto_tienda.git](https://github.com/JMedina255/Proyecto_tienda) (rama `master`) |
 | **Código fuente** | Aún no iniciado (Sujeto a aprobación formal al concluir H05) |
 | **Servicios externos** | Sin provisionar (Pendiente de configuración en hitos posteriores) |

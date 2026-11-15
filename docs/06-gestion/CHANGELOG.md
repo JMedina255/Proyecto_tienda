@@ -6,6 +6,31 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [0.0.7] - 2026-11-15 (Hito H02.1 — Correcciones Críticas de Arquitectura)
+
+### Añadido
+- **Controles de Seguridad Reforzados (`docs/04-seguridad/HARDENING.md`):**
+  - Incorporación de `SEC-AUTHZ-004` (Autorización offline de operaciones sensibles con caducidad de credenciales en caché, lista de revocación local y auditoría criptográfica HMAC).
+  - Incorporación de `SEC-SYNC-003` (Mínimo privilegio en funciones RPC de Supabase, exigiendo `SECURITY INVOKER` o `SECURITY DEFINER` con `search_path`, validación de `auth.uid()` y roles).
+- **Registro de Nuevas Propuestas Técnicas (`docs/06-gestion/DECISIONES.md`):**
+  - Registro formal de `DEC-017` (Período de gracia de 7 días para caducidad de sesiones offline) y `DEC-018` (Política de exclusividad de sesión de caja por dispositivo físico), manteniéndolas en estado `Propuesto` pendiente de decisión.
+
+### Corregido
+- **Durabilidad y Persistencia en SQLite (`docs/02-arquitectura/ARQUITECTURA.md`):**
+  - Análisis comparativo de `PRAGMA synchronous = NORMAL` frente a `FULL` en modo WAL. Establecimiento de política estricta de `synchronous = FULL` para transacciones financieras críticas (ventas, cobros, caja) garantizando persistencia física (*fsync*) ante apagados súbitos o caídas del SO.
+- **Seguridad en Funciones RPC de Supabase (`docs/02-arquitectura/ARQUITECTURA.md`):**
+  - Mitigación del riesgo de bypass de RLS en funciones RPC, priorizando `SECURITY INVOKER` y restringiendo privilegios de ejecución en PostgreSQL.
+- **Requerimientos Nativos y Disponibilidad Offline de OCR (`docs/02-arquitectura/ARQUITECTURA.md`):**
+  - Documentación obligatoria de Expo Development Builds / Prebuild para Google ML Kit y configuración de empaquetado del modelo en el manifiesto nativo para disponibilidad 100% offline tras la instalación.
+- **Sustitución de Garantías por Objetivos de Rendimiento (`docs/02-arquitectura/ARQUITECTURA.md`):**
+  - Reemplazo de afirmaciones categóricas de latencia por metas cuantitativas formalmente sujetas a pruebas empíricas de benchmark en hardware Android representativo.
+- **Reordenamiento Estratégico del Plan de Desarrollo (`docs/05-planificacion/PLAN_DESARROLLO.md`):**
+  - Reestructuración de la fase H06 para construir la infraestructura base de sincronización, outbox e idempotencia antes del desarrollo de ventas y caja (H08), eliminando retrabajos arquitectónicos.
+- **Registro Explícito de Riesgos Técnicos (`docs/06-gestion/DECISIONES.md`):**
+  - Documentación de riesgos técnicos y medidas de mitigación para las opciones recomendadas en `DEC-012`, `DEC-013`, `DEC-014` y `DEC-015`.
+
+---
+
 ## [0.0.6] - 2026-11-15 (Hito H02 — Arquitectura del Sistema y Estrategia Offline-First)
 
 ### Añadido
