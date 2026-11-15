@@ -1,0 +1,78 @@
+# =============================================================================
+# .gitignore — Sistema de Gestión de Librería (Proyecto Tienda)
+# Monorepo: React Native / Expo (Android) + React (Web) + TypeScript + Supabase
+# =============================================================================
+
+# Dependencias y gestores de paquetes
+node_modules/
+.pnpm-store/
+.npm/
+.yarn/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Compilación y artefactos de build
+dist/
+build/
+web-build/
+out/
+.turbo/
+*.tsbuildinfo
+
+# Expo & React Native
+.expo/
+.expo-shared/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Android
+apps/mobile/android/app/build/
+apps/mobile/android/.gradle/
+apps/mobile/android/build/
+apps/mobile/android/.idea/
+*.apk
+*.aab
+
+# iOS (previsión futura)
+apps/mobile/ios/build/
+apps/mobile/ios/Pods/
+*.ipa
+
+# Variables de entorno y secretos (NUNCA incluir credenciales en el repo)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pem
+*.keystore
+
+# Preservar explícitamente plantillas públicas de entorno
+!.env.example
+
+# Supabase Local & Caché de CLI
+supabase/.temp/
+.supabase/local/
+
+# Sistema operativo y editores
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+*.sublime-project
+*.sublime-workspace
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# Archivos de volcado y pruebas temporales
+*.tmp
+*.temp
+coverage/
+.nyc_output/
