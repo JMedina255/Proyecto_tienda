@@ -16,9 +16,9 @@ El plan de desarrollo se estructura en dos grandes etapas:
 ```mermaid
 flowchart TD
     H00["H00: Inicialización Documental\n(Completado)"] --> H00_1["H00.1: Auditoría y Correcciones\n(Completado)"]
-    H00_1 --> H00_2["H00.2: Configuración Git y Política\n(Hito Activo)"]
-    H00_2 --> H01["H01: Especificación Detallada SRS\ny Reglas de Negocio"]
-    H01 --> H02["H02: Arquitectura del Sistema\ny Sincronización Offline"]
+    H00_1 --> H00_2["H00.2: Configuración Git y Política\n(Completado)"]
+    H00_2 --> H01["H01: Especificación Detallada SRS\ny Reglas de Negocio (Completado)"]
+    H01 --> H02["H02: Arquitectura del Sistema\ny Sincronización Offline (Hito Activo)"]
     H02 --> H03["H03: Modelo y Diccionario\nde Datos Relacional"]
     H03 --> H04["H04: Estándares de Programación\ny Hardening de Seguridad"]
     H04 --> H05["H05: Planificación Técnica,\nPruebas y Criterios"]
@@ -64,7 +64,7 @@ A partir de H00.2, cada hito completado tiene como entregable mandatorio:
   - Política permanente de commits y push documentada en `AGENTS.md`.
   - Línea base documental publicada exitosamente en GitHub.
   - Entregable Git: Commit `docs(h00-h00.1): consolidacion documental y auditoria inicial` y push verificado a `origin/master`.
-- **Estado:** **Hito Activo / En ejecución.**
+- **Estado:** **Completado.**
 
 ---
 
@@ -72,11 +72,28 @@ A partir de H00.2, cada hito completado tiene como entregable mandatorio:
 - **Objetivo:** Refinar exhaustivamente la Especificación de Requerimientos de Software ([SRS.md](../01-requerimientos/SRS.md)) y el catálogo de políticas operativas ([REGLAS_NEGOCIO.md](../01-requerimientos/REGLAS_NEGOCIO.md)).
 - **Dependencias:** Aprobación de H00.2.
 - **Entregables:**
-  - Especificación detallada de cada requerimiento funcional (`RF-CAT`, `RF-VTA`, `RF-PAG`, `RF-CAJ`, `RF-GAS`, `RF-PRV`, `RF-PED`, `RF-REP`, `RF-OFF`).
-  - Especificación formal de casos de uso y criterios de aceptación en Gherkin para todos los flujos de mostrador, créditos, arqueos y pedidos.
-  - Refinamiento de las 18 reglas de negocio con casos límite y matrices de decisión.
+  - Especificación detallada de 11 módulos funcionales (45 RFs estructurados con actor, prioridad, precondiciones, reglas vinculadas, criterios de aceptación y excepciones).
+  - Especificación formal de 14 casos de uso con criterios de aceptación Gherkin y diagramas Mermaid renderizables.
+  - Catálogo de 26 reglas de negocio con matriz de compatibilidad de estados y matriz RBAC exhaustiva.
+  - Matriz de trazabilidad integral (`RF` -> `RN` -> `CU` -> `Criterio` -> `Prioridad`) y registro de desafíos para H03.
   - **Entregable Git:** Commit `docs(h01): especificacion detallada de requerimientos` y push a `origin/master`.
 - **Criterios de Aceptación:** Aprobación formal por parte de los interesados de los flujos de negocio sin ambigüedades.
+- **Estado:** **Completado.**
+
+---
+
+### Hito H02: Arquitectura del Sistema y Sincronización Offline
+- **Objetivo:** Detallar el diseño de arquitectura técnica, resolver las decisiones técnicas pendientes de sincronización y OCR, y especificar el motor de replicación asíncrono.
+- **Dependencias:** H01.
+- **Entregables:**
+  - Resolución formal de `DEC-012` (motor de sincronización: PowerSync vs. WatermelonDB vs. Outbox propietario).
+  - Resolución formal de `DEC-013` (tecnología OCR: Google ML Kit on-device vs. cloud).
+  - Resolución formal de `DEC-014` (orquestador monorepo Turborepo + pnpm).
+  - Especificación de protocolos de sincronización, colas Outbox, estructura de payloads JSON y algoritmos deterministas de reconciliación.
+  - Diagramas de secuencia detallados de recuperación de conexión y sincronización bidireccional.
+  - **Entregable Git:** Commit `docs(h02): arquitectura y estrategia offline` y push a `origin/master`.
+- **Criterios de Aceptación:** Arquitectura offline-first completamente validada con pruebas de concepto documentadas.
+- **Estado:** **Hito Activo / Próximo hito.**
 
 ---
 

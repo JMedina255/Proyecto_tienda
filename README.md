@@ -163,10 +163,10 @@ Toda la documentación técnica y de gestión del proyecto reside en el director
 
 | Parámetro | Estado |
 | :--- | :--- |
-| **Fase actual** | Fase 0 — Gobernanza, Inicialización y Control de Versiones |
-| **Hito activo** | **H00.2 — Configuración Git, publicación inicial y política de versionado** |
-| **Hitos completados** | **H00** (Inicialización documental), **H00.1** (Auditoría y consolidación) |
+| **Fase actual** | Fase 1 — Especificación Funcional y Diseño de Arquitectura |
+| **Hito completado recientemente** | **H01 — Especificación detallada del SRS y reglas de negocio** |
+| **Hitos cerrados** | **H00** (Inicialización), **H00.1** (Auditoría), **H00.2** (Git y versionado), **H01** (SRS y reglas) |
 | **Repositorio remoto** | [https://github.com/JMedina255/Proyecto_tienda.git](https://github.com/JMedina255/Proyecto_tienda) (rama `master`) |
 | **Código fuente** | Aún no iniciado (Sujeto a aprobación formal al concluir H05) |
 | **Servicios externos** | Sin provisionar (Pendiente de configuración en hitos posteriores) |
-| **Próximo hito** | **H01:** Especificación detallada de requerimientos (SRS) y reglas de negocio |
+| **Próximo hito** | **H02:** Arquitectura del sistema y sincronización offline |

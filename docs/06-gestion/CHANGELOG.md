@@ -6,6 +6,24 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [0.0.4] - 2026-11-15 (Hito H01 — Especificación Detallada del SRS y Reglas de Negocio)
+
+### Añadido
+- **Refinamiento Integral del SRS (`docs/01-requerimientos/SRS.md`):**
+  - Especificación exhaustiva de 11 módulos funcionales y 45 requerimientos funcionales (`RF-AUT`, `RF-CAT`, `RF-OCR`, `RF-VTA`, `RF-PAG`, `RF-CAJ`, `RF-GAS`, `RF-PRV`, `RF-PED`, `RF-REP`, `RF-OFF`) estructurados con identificador, descripción verificable, actor, prioridad MVP/Futura, precondiciones, reglas vinculadas, criterios de aceptación y excepciones.
+  - Especificación formal de 14 casos de uso (`CU-AUT-01`, `CU-CAT-01..02`, `CU-VTA-01..02`, `CU-PAG-01..02`, `CU-CAJ-01..03`, `CU-PED-01..02`, `CU-PRV-01`, `CU-GAS-01`) con flujos principales, alternativos, excepciones y criterios de aceptación Gherkin.
+  - 4 diagramas Mermaid renderizables: flujo de ventas normales vs. rápidas, ciclo de sesiones de caja con cierres offline y conciliación, pedidos de faltantes con recepciones parciales, y mapa de actores y módulos.
+  - Matriz de trazabilidad integral (`RF` → `RN` → `CU` → `Criterio` → `Prioridad`).
+  - Registro de observaciones y directrices de modelado relacional para el hito H03.
+- **Ampliación y Consolidación de Reglas de Negocio (`docs/01-requerimientos/REGLAS_NEGOCIO.md`):**
+  - Catálogo formal ampliado a 26 reglas de negocio (`RN-ALC-001` a `RN-OFF-001`), incorporando reglas para registro sin ISBN y prevención de duplicados (`RN-CAT-004`), categorización temática (`RN-CAT-005`), protección de datos bancarios de proveedores (`RN-PRV-002`), pedidos de no catalogados por foto/texto libre (`RN-PED-003`), anticipos con mercadería retenida (`RN-PAG-004`), arqueo físico desglosado por medio de pago (`RN-CAJ-003`), y restricciones offline (`RN-OFF-001`).
+  - Matriz de compatibilidad estricta entre estados de venta, pago y entrega física para evitar estados incompatibles.
+  - Matriz de control de acceso basado en roles (RBAC) detallada por operación.
+- **Registro de Decisiones Arquitectónicas (`docs/06-gestion/DECISIONES.md`):**
+  - Incorporación de `DEC-016` (Propuesta de política de descuentos máximos delegados al rol Vendedor).
+
+---
+
 ## [0.0.3] - 2026-11-15 (Hito H00.2 — Configuración Git, Publicación Inicial y Política de Versionado)
 
 ### Añadido
