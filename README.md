@@ -165,9 +165,9 @@ Toda la documentación técnica y de gestión del proyecto reside en el director
 | Parámetro | Estado |
 | :--- | :--- |
 | **Fase actual** | Fase 2 — Construcción Incremental |
-| **Hito completado recientemente** | **H06 — Inicialización del monorepo y base Offline-First** |
-| **Hitos cerrados** | **H00** (Inicialización), **H00.1** (Auditoría), **H00.2** (Git y versionado), **H01** (SRS y reglas), **H01.1** (Simplificación y normalización), **H02** (Arquitectura), **H02.1** (Correcciones críticas), **H03** (Modelo y diccionario), **H04** (Estándares y hardening), **H05** (Planificación y pruebas), **H06** (Monorepo y base offline) |
+| **Hito completado recientemente** | **H06.1 — Estabilización Android y verificación de Supabase** |
+| **Hitos cerrados** | **H00** (Inicialización), **H00.1** (Auditoría), **H00.2** (Git y versionado), **H01** (SRS y reglas), **H01.1** (Simplificación y normalización), **H02** (Arquitectura), **H02.1** (Correcciones críticas), **H03** (Modelo y diccionario), **H04** (Estándares y hardening), **H05** (Planificación y pruebas), **H06** (Monorepo base), **H06.1** (Estabilización Android y Supabase) |
 | **Repositorio remoto** | [https://github.com/JMedina255/Proyecto_tienda.git](https://github.com/JMedina255/Proyecto_tienda) (rama `master`) |
-| **Código fuente** | Inicializado monorepo con Turborepo + pnpm workspaces, 4 paquetes modulares y app móvil Expo Android (34 pruebas automatizadas aprobadas) |
-| **Servicios externos** | Cliente Supabase tipado y simulado localmente (Backend cloud real pendiente de aprovisionamiento) |
+| **Código fuente** | Monorepo estabilizado, SQLite nativo y persistencia Outbox comprobados en emulador Android Pixel_8, SHA-256 portable en Hermes, 41 pruebas automatizadas aprobadas |
+| **Servicios externos** | Proyecto Supabase `hixrwpiyyhrifsxgekfe` inspeccionado vía MCP en solo lectura (0 tablas/migraciones remotas, 0 alertas de seguridad) |
 | **Próximo hito** | **H07:** Catálogo bibliográfico, categorías, ediciones y captura asistida por OCR on-device |

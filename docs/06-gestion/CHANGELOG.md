@@ -6,6 +6,42 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [0.1.1] - 2026-11-15 (Hito H06.1 — Estabilización Android y Verificación de Supabase)
+
+### Añadido
+- **Punto de Entrada Móvil (`apps/mobile/index.js`):**
+  - Registro explícito de la aplicación raíz mediante `registerRootComponent(App)` de Expo.
+- **Adaptador Nativo Expo SQLite (`packages/database/src/expo-driver.ts`):**
+  - Implementación de `ExpoSqliteDriver` sobre el contrato unificado `SqliteDriver` y delegación nativa hacia `expo-sqlite` (SDK 52+).
+- **Recuperación de Mutaciones Huérfanas (`packages/database/src/outbox-repository.ts`):**
+  - Incorporación de `resetInProgressToPending()` para restaurar automáticamente a `pending` aquellas mutaciones que quedaron en `in_progress` por caídas o reinicios inesperados.
+- **Recursos Gráficos Básicos (`apps/mobile/assets`):**
+  - Creación de activos PNG (`icon.png`, `splash.png`, `adaptive-icon.png`, `favicon.png`) requeridos por el empaquetador de Expo y Android.
+- **Interfaz Interactiva de Verificación en Android (`apps/mobile/App.tsx`):**
+  - Panel operativo que consulta pragmas reales de SQLite en el dispositivo (`journal_mode = WAL`, `synchronous = FULL`, `foreign_keys = ON`), aplica migraciones DDL, inserta mutaciones reales en Outbox, comprueba persistencia tras cierre de conexión y prueba recuperación de errores.
+
+### Corregido
+- **Sustitución de `node:crypto` por Implementación Portable (`packages/sync-engine`):**
+  - Reemplazo de `node:crypto` por `js-sha256`, eliminando la incompatibilidad con el runtime Hermes de React Native y manteniendo paridad determinista exacta con vectores estándar NIST.
+- **Aislamiento de Dependencia Node `better-sqlite3` (`packages/database`):**
+  - Desacoplamiento de `BetterSqliteDriver` del bundle principal exportándolo bajo el subpath `./test` (`@tienda/database/test`), evitando que Metro intente resolver los módulos `fs` y `path` de Node en Android.
+- **Sincronización de Dependencias Expo en Móvil (`apps/mobile`):**
+  - Instalación de `expo-sqlite@~15.1.4` y actualización de `react-native` a `0.76.9` para alineación 100% con Expo SDK 52.
+
+### Verificado
+- **Arranque Real en Dispositivo Android (`Pixel_8`):**
+  - Compilación e inicialización comprobada de la aplicación mediante Expo Go en emulador Android API 36.
+- **Persistencia Física y Recuperación Offline:**
+  - Creación y apertura comprobada de `tienda.db` en el sandbox privado de Android con WAL y `synchronous = FULL`.
+  - Persistencia de mutaciones Outbox verificada tras cierre forzado de la aplicación (`am force-stop`) y reinicio.
+  - Funcionamiento y encolado de mutaciones verificado en Modo Avión (sin conexión de red).
+- **Inspección Read-Only de Supabase MCP (`hixrwpiyyhrifsxgekfe`):**
+  - Verificación de estado `ACTIVE_HEALTHY` del proyecto, base remota PostgreSQL GA limpia (0 tablas en `public`, 0 migraciones aplicadas) y 0 avisos de seguridad en advisors.
+- **Suites Automatizadas:**
+  - 41 pruebas automatizadas aprobadas al 100% (Vitest) y verificación de tipos TypeScript (`tsc --noEmit`) sin errores.
+
+---
+
 ## [0.1.0] - 2026-11-15 (Hito H06 — Inicialización del Monorepo y Base Offline-First)
 
 ### Añadido

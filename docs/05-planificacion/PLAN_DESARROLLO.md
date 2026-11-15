@@ -30,7 +30,8 @@ flowchart TD
 
     subgraph Fase_Construccion["Fase 2: Construcción Incremental"]
         H05 ==> H06["H06: Monorepo, SQLite y Sync Base (Completado)"]
-        H06 ==> H07["H07: Catálogo, Ediciones y OCR On-Device (Próximo)"]
+        H06 ==> H06_1["H06.1: Estabilización Android y Supabase (Completado)"]
+        H06_1 ==> H07["H07: Catálogo, Ediciones y OCR On-Device (Próximo)"]
         H07 --> H08["H08: Caja, Ventas, Pagos Mixtos y Fiados"]
         H08 --> H09["H09: Proveedores, Pedidos, Recepciones y Gastos"]
         H09 --> H10["H10: Pruebas Integrales Offline y Conciliación"]
@@ -54,7 +55,8 @@ flowchart TD
 - **H03:** Modelo relacional de 26 entidades y diccionario relacional exhaustivo ([Commit `7326e39`](https://github.com/JMedina255/Proyecto_tienda/commit/7326e39)).
 - **H04:** Estándares de TypeScript, Zod, Result pattern y matriz de seguridad de 21 controles ([Commit `a9d01f0`](https://github.com/JMedina255/Proyecto_tienda/commit/a9d01f0)).
 - **H05:** Plan de implementación incremental, estrategia de pruebas, criterios de aceptación (*Quality Gates*) y clasificación de decisiones pendientes ([Commit `a4c73dc`](https://github.com/JMedina255/Proyecto_tienda/commit/a4c73dc)).
-- **H06 (Hito Completado):** Monorepo con Turborepo y pnpm workspaces, paquetes modulares (`shared-types`, `business-logic`, `database`, `sync-engine`), persistencia SQLite WAL `FULL`, cola Outbox, motor de sincronización con backoff e idempotencia SHA-256, app móvil Expo Android y 34 pruebas automatizadas aprobadas. **Completado.**
+- **H06:** Monorepo con Turborepo y pnpm workspaces, paquetes modulares (`shared-types`, `business-logic`, `database`, `sync-engine`), persistencia SQLite WAL `FULL`, cola Outbox, motor de sincronización con backoff e idempotencia SHA-256 ([Commit `21ee884`](https://github.com/JMedina255/Proyecto_tienda/commit/21ee884)).
+- **H06.1 (Hito Completado):** Estabilización Android en emulador real (`Pixel_8`), integración nativa de `expo-sqlite` vía `ExpoSqliteDriver`, SHA-256 portable en runtime Hermes (`js-sha256`), recuperación de mutaciones huérfanas `in_progress`, verificación offline en Modo Avión e inspección read-only de Supabase MCP (`hixrwpiyyhrifsxgekfe`). 41 pruebas automatizadas aprobadas. **Completado.**
 
 ---
 

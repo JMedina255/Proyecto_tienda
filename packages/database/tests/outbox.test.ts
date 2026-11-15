@@ -89,4 +89,19 @@ describe('Repositorio Outbox (outbox-repository.ts)', () => {
     expect(await repo.hasIdempotencyKey(sampleMutation.idempotencyKey)).toBe(true);
     expect(await repo.countPending()).toBe(1);
   });
+
+  it('recupera mutaciones huérfanas en in_progress regresándolas a pending tras reinicio inesperado', async () => {
+    await repo.enqueue(sampleMutation);
+    await repo.markInProgress([sampleMutation.id]);
+
+    expect(await repo.countPending()).toBe(0);
+
+    const recovered = await repo.resetInProgressToPending();
+    expect(recovered).toBe(1);
+    expect(await repo.countPending()).toBe(1);
+
+    const pending = await repo.getPending(10);
+    expect(pending[0]?.id).toBe(sampleMutation.id);
+    expect(pending[0]?.status).toBe('pending');
+  });
 });

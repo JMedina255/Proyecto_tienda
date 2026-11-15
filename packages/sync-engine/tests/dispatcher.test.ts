@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { BetterSqliteDriver, MigrationRunner, OutboxRepository } from '@tienda/database';
+import { MigrationRunner, OutboxRepository } from '@tienda/database';
+import { BetterSqliteDriver } from '@tienda/database/test';
 import { SimulatedSupabaseRpcClient } from '../src/rpc-client.js';
 import { SyncDispatcher } from '../src/dispatcher.js';
 import { generateIdempotencyKey } from '../src/idempotency.js';

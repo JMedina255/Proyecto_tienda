@@ -84,6 +84,21 @@ export class OutboxRepository {
   }
 
   /**
+   * Recupera mutaciones que quedaron huérfanas en estado 'in_progress' debido a
+   * un cierre forzado o reinicio inesperado de la aplicación, retornándolas a 'pending'.
+   */
+  async resetInProgressToPending(): Promise<number> {
+    const now = new Date().toISOString();
+    const result = await this.db.runAsync(
+      `UPDATE sync_outbox
+       SET status = 'pending', updated_at = ?
+       WHERE status = 'in_progress';`,
+      now,
+    );
+    return result.changes;
+  }
+
+  /**
    * Marca mutaciones como sincronizadas ('synced').
    */
   async markSynced(ids: readonly string[]): Promise<void> {

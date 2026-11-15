@@ -4,7 +4,15 @@
  * Trazabilidad: ARQUITECTURA.md §6.3, MODELO_DATOS.md §1.3, SEC-SYNC-002
  */
 
-import { createHash } from 'node:crypto';
+import { sha256 } from 'js-sha256';
+
+/**
+ * Calcula el hash SHA-256 de una cadena de texto en formato hexadecimal en minúsculas.
+ * Compatible con Node.js, navegadores y React Native / Hermes sin dependencias nativas.
+ */
+export const computeSha256 = (input: string): string => {
+  return sha256(input);
+};
 
 export interface IdempotencyParams {
   readonly dispositivoId: string;
@@ -30,7 +38,7 @@ export const generateIdempotencyKey = (params: IdempotencyParams): string => {
     normalizedPayload,
   ].join(':');
 
-  return createHash('sha256').update(canonicalString, 'utf8').digest('hex');
+  return sha256(canonicalString);
 };
 
 /**

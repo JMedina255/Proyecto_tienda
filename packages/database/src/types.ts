@@ -54,3 +54,16 @@ export interface DatabaseConfig {
   readonly synchronous?: 'FULL' | 'NORMAL';
   readonly foreignKeys?: boolean;
 }
+
+/**
+ * Firma estructural compatible con SQLiteDatabase de 'expo-sqlite' (SDK 52+).
+ */
+export interface ExpoSqliteDatabaseLike {
+  execAsync(sql: string): Promise<void>;
+  runAsync(sql: string, ...params: unknown[]): Promise<{ lastInsertRowId: number; changes: number }>;
+  getFirstAsync<T = unknown>(sql: string, ...params: unknown[]): Promise<T | null>;
+  getAllAsync<T = unknown>(sql: string, ...params: unknown[]): Promise<T[]>;
+  withTransactionAsync(task: () => Promise<void>): Promise<void>;
+  withExclusiveTransactionAsync(task: () => Promise<void>): Promise<void>;
+  closeAsync(): Promise<void>;
+}

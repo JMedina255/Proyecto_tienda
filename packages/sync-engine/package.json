@@ -11,13 +11,14 @@
     "clean": "rimraf dist tsconfig.tsbuildinfo"
   },
   "dependencies": {
-    "@tienda/shared-types": "workspace:*",
     "@tienda/business-logic": "workspace:*",
-    "@tienda/database": "workspace:*"
+    "@tienda/database": "workspace:*",
+    "@tienda/shared-types": "workspace:*",
+    "js-sha256": "^1.0.0"
   },
   "devDependencies": {
-    "typescript": "^5.7.3",
     "rimraf": "^6.0.1",
+    "typescript": "^5.7.3",
     "vitest": "^3.0.5"
   }
 }

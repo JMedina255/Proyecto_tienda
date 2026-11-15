@@ -7,4 +7,4 @@ export * from './types.js';
 export * from './connection.js';
 export * from './migrations.js';
 export * from './outbox-repository.js';
-export * from './test-driver.js';
+export * from './expo-driver.js';
