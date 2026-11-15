@@ -17,26 +17,26 @@ Cada decisión cuenta con un identificador único, fecha de registro, estado, co
 
 ## Índice de Decisiones
 
-| ID | Título | Estado | Fecha de Registro |
-| :--- | :--- | :--- | :--- |
-| [DEC-001](#dec-001-alcance-inicial-restringido-a-tienda-única) | Alcance inicial restringido a tienda única | **Confirmado** | 2026-11-15 |
-| [DEC-002](#dec-002-estrategia-de-plataforma-android-primero-y-panel-web-posterior) | Estrategia de plataforma: Android primero y panel web posterior | **Confirmado** | 2026-11-15 |
-| [DEC-003](#dec-003-catálogo-referencial-sin-control-cuantitativo-estricto-de-stock-en-mvp) | Catálogo referencial sin control cuantitativo estricto de stock en MVP | **Confirmado** | 2026-11-15 |
-| [DEC-004](#dec-004-desacoplamiento-de-título-respecto-a-ediciones-y-estados-de-conservación) | Desacoplamiento de título respecto a ediciones y estados de conservación | **Confirmado** | 2026-11-15 |
-| [DEC-005](#dec-005-relación-muchos-a-muchos-entre-libros-y-proveedores-con-costos-variables) | Relación muchos a muchos entre libros y proveedores con costos variables | **Confirmado** | 2026-11-15 |
-| [DEC-006](#dec-006-autorización-de-entrega-con-saldo-pendiente-de-cobro-fiado) | Autorización de entrega con saldo pendiente de cobro (fiado) | **Confirmado** | 2026-11-15 |
-| [DEC-007](#dec-007-soporte-de-cierres-de-caja-offline-provisionales-con-conciliación-posterior) | Soporte de cierres de caja offline provisionales con conciliación posterior | **Confirmado** | 2026-11-15 |
-| [DEC-008](#dec-008-exclusión-de-facturación-electrónica-en-mvp-con-diseño-extensible) | Exclusión de facturación electrónica en MVP con diseño extensible | **Confirmado** | 2026-11-15 |
-| [DEC-009](#dec-009-arquitectura-offline-first-con-sqlite-local-y-supabase-remoto) | Arquitectura Offline-First con SQLite local y Supabase remoto | **Confirmado** | 2026-11-15 |
-| [DEC-010](#dec-010-captura-asistida-de-libros-mediante-fotografía-y-ocr) | Captura asistida de libros mediante fotografía y OCR | **Confirmado** | 2026-11-15 |
-| [DEC-011](#dec-011-modalidad-de-venta-rápida-con-foto-y-detalle-pendiente-de-completar) | Modalidad de venta rápida con foto y detalle pendiente de completar | **Confirmado** | 2026-11-15 |
-| [DEC-012](#dec-012-selección-del-motor-y-estrategia-de-sincronización-offline) | Selección del motor y estrategia de sincronización offline | **Propuesto (Recomendado en H02)** | 2026-11-15 |
-| [DEC-013](#dec-013-selección-de-la-tecnología-de-reconocimiento-ocr) | Selección de la tecnología de reconocimiento OCR | **Propuesto (Recomendado en H02)** | 2026-11-15 |
-| [DEC-014](#dec-014-orquestador-de-monorepo-turborepo--pnpm) | Orquestador de monorepo: Turborepo + pnpm | **Propuesto (Recomendado en H02)** | 2026-11-15 |
-| [DEC-015](#dec-015-estrategia-de-cifrado-de-base-de-datos-local-sqlite) | Estrategia de cifrado de base de datos local SQLite | **Propuesto (Recomendado en H02)** | 2026-11-15 |
-| [DEC-016](#dec-016-política-de-descuentos-máximos-delegados) | Política de descuentos máximos delegados para el rol Vendedor | **Propuesto (Pendiente de decisión)** | 2026-11-15 |
-| [DEC-017](#dec-017-período-de-gracia-para-caducidad-de-sesiones-offline) | Período de gracia para caducidad de sesiones offline | **Propuesto (Pendiente de decisión)** | 2026-11-15 |
-| [DEC-018](#dec-018-política-de-exclusividad-de-sesión-de-caja-por-dispositivo) | Exclusividad de sesión de caja por dispositivo físico | **Propuesto (Pendiente de decisión)** | 2026-11-15 |
+| ID | Título | Estado | Clasificación H05 |
+| :--- | :--- | :--- | :---: |
+| [DEC-001](#dec-001-alcance-inicial-restringido-a-tienda-única) | Alcance inicial restringido a tienda única | **Confirmado** | Aprobada |
+| [DEC-002](#dec-002-estrategia-de-plataforma-android-primero-y-panel-web-posterior) | Estrategia de plataforma: Android primero y panel web posterior | **Confirmado** | Aprobada |
+| [DEC-003](#dec-003-catálogo-referencial-sin-control-cuantitativo-estricto-de-stock-en-mvp) | Catálogo referencial sin control cuantitativo estricto de stock en MVP | **Confirmado** | Aprobada |
+| [DEC-004](#dec-004-desacoplamiento-de-título-respecto-a-ediciones-y-estados-de-conservación) | Desacoplamiento de título respecto a ediciones y estados de conservación | **Confirmado** | Aprobada |
+| [DEC-005](#dec-005-relación-muchos-a-muchos-entre-libros-y-proveedores-con-costos-variables) | Relación muchos a muchos entre libros y proveedores con costos variables | **Confirmado** | Aprobada |
+| [DEC-006](#dec-006-autorización-de-entrega-con-saldo-pendiente-de-cobro-fiado) | Autorización de entrega con saldo pendiente de cobro (fiado) | **Confirmado** | Aprobada |
+| [DEC-007](#dec-007-soporte-de-cierres-de-caja-offline-provisionales-con-conciliación-posterior) | Soporte de cierres de caja offline provisionales con conciliación posterior | **Confirmado** | Aprobada |
+| [DEC-008](#dec-008-exclusión-de-facturación-electrónica-en-mvp-con-diseño-extensible) | Exclusión de facturación electrónica en MVP con diseño extensible | **Confirmado** | Aprobada |
+| [DEC-009](#dec-009-arquitectura-offline-first-con-sqlite-local-y-supabase-remoto) | Arquitectura Offline-First con SQLite local y Supabase remoto | **Confirmado** | Aprobada |
+| [DEC-010](#dec-010-captura-asistida-de-libros-mediante-fotografía-y-ocr) | Captura asistida de libros mediante fotografía y OCR | **Confirmado** | Aprobada |
+| [DEC-011](#dec-011-modalidad-de-venta-rápida-con-foto-y-detalle-pendiente-de-completar) | Modalidad de venta rápida con foto y detalle pendiente de completar | **Confirmado** | Aprobada |
+| [DEC-012](#dec-012-selección-del-motor-y-estrategia-de-sincronización-offline) | Selección del motor y estrategia de sincronización offline | **Propuesto (Recomendado)** | **Imprescindible antes de H06** |
+| [DEC-013](#dec-013-selección-de-la-tecnología-de-reconocimiento-ocr) | Selección de la tecnología de reconocimiento OCR | **Propuesto (Recomendado)** | **Necesaria antes de H07** |
+| [DEC-014](#dec-014-orquestador-de-monorepo-turborepo--pnpm) | Orquestador de monorepo: Turborepo + pnpm | **Propuesto (Recomendado)** | **Imprescindible antes de H06** |
+| [DEC-015](#dec-015-estrategia-de-cifrado-de-base-de-datos-local-sqlite) | Estrategia de cifrado de base de datos local SQLite y replicación segura | **Propuesto (Recomendado)** | **Imprescindible antes de H06** |
+| [DEC-016](#dec-016-política-de-descuentos-máximos-delegados) | Política de descuentos máximos delegados para el rol Vendedor | **Propuesto (Pendiente)** | **Necesaria antes de H08** |
+| [DEC-017](#dec-017-período-de-gracia-para-caducidad-de-sesiones-offline) | Período de gracia para caducidad de sesiones offline | **Propuesto (Pendiente)** | **Diferible (evaluar en H10)** |
+| [DEC-018](#dec-018-política-de-exclusividad-de-sesión-de-caja-por-dispositivo) | Exclusividad de sesión de caja por dispositivo físico | **Propuesto (Pendiente)** | **Necesaria antes de H08** |
 
 ---
 
@@ -186,8 +186,13 @@ Cada decisión cuenta con un identificador único, fecha de registro, estado, co
   1. *SQLCipher (Cifrado completo de base de datos a nivel de página):* Ofrece cifrado homogéneo de todo el archivo SQLite. Desventajas: sobrecarga de CPU/IO de un 15-25% en operaciones frecuentes de mostrador en hardware modesto; complejidad de integración con Expo (requiere módulo nativo personalizado); fragilidad crítica: si la clave maestra en el Keystore se corrompe o se desincroniza, toda la base de datos local queda irremediablemente ilegible y corrompida.
   2. *Cifrado Híbrido por Campos (Sandbox SO Android FBE + Android Keystore con `expo-secure-store` y AES-256-GCM):* La base de datos SQLite estándar aprovecha el aislamiento del sandbox de Android y el cifrado de disco del sistema operativo (File-Based Encryption). Los campos de alta sensibilidad (`numero_cuenta_cifrado` de proveedores, PINs, tokens GoTrue) se cifran a nivel de aplicación con AES-256-GCM antes de persistir.
   3. *Solo Sandbox del SO Android:* Sin cifrado adicional a nivel aplicativo. Desventaja: vulnerable si el dispositivo es rooteado o intervenido mediante depuración ADB.
-- **Recomendación H02 / H04:** **Cifrado Híbrido por Campos (Sandbox SO + Android Keystore con `expo-secure-store`)**.
+- **Recomendación H02 / H04 / H05:** **Cifrado Híbrido por Campos (Sandbox SO + Android Keystore con `expo-secure-store`)**.
 - **Justificación:** Cumple `SEC-DATA-001` y `SEC-DATA-002`, mantiene el rendimiento de SQLite nativo (`PRAGMA synchronous = FULL` para finanzas), simplifica la compatibilidad con Expo y elimina el riesgo de corrupción total de base de datos inherente a SQLCipher.
+- **Acceso Multi-dispositivo a Datos Bancarios Replicados sin Compartir Claves Privadas:**
+  - En PostgreSQL (Supabase), las cuentas bancarias de proveedores (`numero_cuenta_cifrado`) se almacenan protegidas mediante RLS estricto y cifrado en reposo (Supabase Vault / `pgcrypto`); solo los roles `Dueño` y `Administrador` tienen privilegios de consulta.
+  - La replicación hacia terminales móviles autorizados viaja exclusivamente por TLS 1.3 autenticado con JWT de GoTrue.
+  - Al recibirse en cada terminal autorizado, la app móvil cifra el dato para su persistencia en el SQLite local utilizando la clave simétrica AES-256-GCM generada en el Android Keystore (`expo-secure-store`) de ese dispositivo específico.
+  - Cada terminal mantiene su propia clave simétrica local por hardware. Ninguna clave privada o simétrica se comparte ni transmite entre dispositivos, garantizando aislamiento descentralizado sin comprometer la sincronización multi-dispositivo.
 - **Ciclo de Vida de Claves y Compensaciones de Recuperación:**
   - *Generación:* Clave simétrica AES-256 generada por hardware criptográfico en Android Keystore durante el primer inicio de sesión del operador.
   - *Rotación:* Al modificarse el PIN del supervisor o tras intervalos programados (90 días), se ejecuta un proceso en segundo plano que desencripta con la clave vigente y reencripta con la nueva clave generada antes de invalidar la anterior.

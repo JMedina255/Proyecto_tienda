@@ -37,9 +37,9 @@
 | ID | Regla | Especificación Operativa | Decisión | Estado |
 | :--- | :--- | :--- | :---: | :---: |
 | **RN-PAG-001** | Medios de pago combinados | Se admiten pagos mixtos fraccionando entre Efectivo (con cálculo de vuelto), Billetera Digital (con N° operación) y POS (con código referencia). | N/A | **Confirmada** |
-| **RN-PAG-002** | Autorización de fiados | Si el cliente retira mercadería con saldo pendiente (`total_pagado < total_neto`), exige autorización de Dueño/Admin y registro de nombre, teléfono y DNI del deudor. | [DEC-006](../06-gestion/DECISIONES.md#dec-006-autorización-de-entrega-con-saldo-pendiente-de-cobro-fiado) | **Confirmada** |
+| **RN-PAG-002** | Autorización de fiados | Si el cliente retira mercadería con saldo pendiente (`total_pagado < total_neto`), exige autorización obligatoria de Dueño/Admin con PIN y registro completo de nombre y documento oficial (DNI/CE, mín. 6 caracteres). Mercadería sale de tienda (`estado_entrega = 'entregado_saldo_pendiente'`). | [DEC-006](../06-gestion/DECISIONES.md#dec-006-autorización-de-entrega-con-saldo-pendiente-de-cobro-fiado) | **Confirmada** |
 | **RN-PAG-003** | Amortización de deuda | Los abonos a ventas fiadas registran fecha, monto, caja receptora y medio de pago, liquidando el saldo hasta `estado_pago = 'total'`. | N/A | **Confirmada** |
-| **RN-PAG-004** | Reserva con anticipo | Si hay cobro parcial sin autorización de fiado, el libro permanece físicamente custodiado en tienda (`estado_entrega = 'retenido'`). | H01 | **Confirmada** |
+| **RN-PAG-004** | Reserva con anticipo | Si hay cobro parcial y la mercadería permanece custodiada físicamente en tienda (`estado_entrega = 'retenido'`), no requiere autorización de supervisor. Exige registrar nombre y teléfono de contacto del cliente para avisos de llegada o vencimiento. | H01 | **Confirmada** |
 
 ### 1.5 Caja y Egresos Operativos
 | ID | Regla | Especificación Operativa | Decisión | Estado |

@@ -18,9 +18,9 @@ Este directorio centraliza la documentación arquitectónica, técnica, de reque
 | `03-estandares/` | [ESTANDAR_PROGRAMACION.md](03-estandares/ESTANDAR_PROGRAMACION.md) | Convenciones de TypeScript estricto, React Native, arquitectura modular feature-based, repositorios SQLite, Zod y testing. | **Consolidado y Refinado en H04** |
 | `03-estandares/` | [DICCIONARIO_DATOS.md](03-estandares/DICCIONARIO_DATOS.md) | Especificación y catálogo de 26 tablas, tipos PostgreSQL/SQLite, claves, restricciones e integridad financiera. | **Consolidado / Refinado en H04** |
 | `04-seguridad/` | [HARDENING.md](04-seguridad/HARDENING.md) | Línea base de seguridad, RLS, cifrado local (DEC-015), protección de storage, RPCs seguras y controles de sincronización. | **Consolidado y Refinado en H04** |
-| `05-planificacion/` | [PLAN_DESARROLLO.md](05-planificacion/PLAN_DESARROLLO.md) | Cronograma de fases e hitos (H00 a H06+), dependencias, criterios de aceptación y entregables Git. Ubicado exclusivamente en `docs/05-planificacion/`. | **Actualizado / Vigente H04** |
-| `06-gestion/` | [DECISIONES.md](06-gestion/DECISIONES.md) | Registro de Decisiones de Arquitectura (ADR) con estados (Confirmado, Propuesto, Pendiente). | **Vigente / Actualizado H04** |
-| `06-gestion/` | [CHANGELOG.md](06-gestion/CHANGELOG.md) | Historial de versiones del repositorio documental y técnico. | **Vigente / Versión 0.0.9** |
+| `05-planificacion/` | [PLAN_DESARROLLO.md](05-planificacion/PLAN_DESARROLLO.md) | Cronograma de fases e hitos (H00 a H11), matriz de pruebas, criteria gates y entregables Git. Ubicado en `docs/05-planificacion/`. | **Consolidado y Refinado en H05** |
+| `06-gestion/` | [DECISIONES.md](06-gestion/DECISIONES.md) | Registro de Decisiones de Arquitectura (ADR) con estados (Confirmado, Propuesto) y clasificación H05. | **Vigente / Actualizado H05** |
+| `06-gestion/` | [CHANGELOG.md](06-gestion/CHANGELOG.md) | Historial de versiones del repositorio documental y técnico. | **Vigente / Versión 0.0.10** |
 
 ---
 

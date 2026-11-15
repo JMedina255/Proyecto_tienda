@@ -349,8 +349,8 @@
 | `tipo_venta` | `VARCHAR(20)` | `TEXT` | No | CHECK | `'normal'` | `'normal'`, `'rapida'`. | N/A |
 | `serie` | `VARCHAR(10)` | `TEXT` | No | NOT NULL | `'NV01'` | Serie asignada al terminal móvil (ej. `'NV01'`, `'NV02'`). | N/A |
 | `correlativo` | `INTEGER` | `INTEGER` | No | INDEX | N/A | Correlativo monotónico local (`UNIQUE(serie, correlativo)`).| N/A |
-| `cliente_nombre` | `VARCHAR(150)`| `TEXT` | Sí | CHECK | `NULL` | Obligatorio si `saldo_pendiente > 0` (mín. 3 caracteres). | N/A |
-| `cliente_documento`|`VARCHAR(30)` | `TEXT` | Sí | CHECK | `NULL` | Obligatorio si `saldo_pendiente > 0` (mín. 6 caracteres: DNI/tel).| N/A |
+| `cliente_nombre` | `VARCHAR(150)`| `TEXT` | Sí | CHECK | `NULL` | Obligatorio si `saldo_pendiente > 0` (mín. 3 caracteres para reserva o fiado).| N/A |
+| `cliente_documento`|`VARCHAR(30)` | `TEXT` | Sí | CHECK | `NULL` | Obligatorio si `entregado_saldo_pendiente` (DNI/CE mín. 6 chars). Opcional si `retenido`.| N/A |
 | `total_bruto` | `NUMERIC(12,2)`|`INTEGER`| No | CHECK(>=0) | `0` (PG: `0.00`) | Suma de precios referenciales (en céntimos en SQLite). | N/A |
 | `total_descuentos`|`NUMERIC(12,2)`|`INTEGER`| No | CHECK(>=0) | `0` (PG: `0.00`) | Descuento total aplicado (en céntimos en SQLite). | N/A |
 | `total_neto` | `NUMERIC(12,2)`|`INTEGER`| No | CHECK(>=0) | `0` (PG: `0.00`) | Importe final a cobrar (`bruto - descuento`, en céntimos).| N/A |
@@ -484,6 +484,6 @@ Para garantizar la coherencia matemática y prevenir fraudes o descalces en modo
 | **Desglose de arqueo no negativo** | PG / SQLite | `CHECK(monto_contado >= 0.00)` en `arqueos_detalle`. | Evita conteos físicos anómalos al cierre de caja. |
 | **Inmutabilidad de pagos** | RLS / Triggers| Prohibición de `UPDATE` y `DELETE` en `pagos_venta` y `movimientos_caja`. | Garantiza libro mayor auditable (*append-only*). |
 | **Moneda entera en SQLite y decimal en PG**| PG / SQLite | SQLite `INTEGER` (céntimos) / PG `NUMERIC(12,2)` (`SQLite = ROUND(PG*100)`).| Elimina errores de redondeo de punto flotante IEEE 754. |
-| **Identificación obligatoria en clientes fiados**| PG / SQLite | `CHECK(saldo_pendiente = 0 OR (cliente_nombre IS NOT NULL AND cliente_documento IS NOT NULL))` | Evita deudas anónimas y garantiza trazabilidad de cobranza (`RN-VTA-003`). |
+| **Identificación obligatoria: reservas vs fiados**| PG / SQLite | `CHECK(saldo_pendiente = 0 OR (estado_entrega = 'retenido' AND cliente_nombre IS NOT NULL) OR (estado_entrega = 'entregado_saldo_pendiente' AND autorizador_id IS NOT NULL AND cliente_nombre IS NOT NULL AND cliente_documento IS NOT NULL))` | Exige nombre en reservas (`retenido`) y DNI oficial + PIN de supervisor en fiados (`entregado_saldo_pendiente`). |
 | **Unicidad de serie y correlativo multi-terminal**| PG / SQLite | `UNIQUE(serie, correlativo)` en cabecera `ventas`. | Permite numeración offline autónoma sin colisión entre terminales. |
 | **Protección contra sobrepagos concurrentes**| RPC / SQLite | Bloqueo `FOR UPDATE` en Supabase y `BEGIN IMMEDIATE` en SQLite validando saldo. | Impide que dos cobros simultáneos superen la deuda neta de una venta. |

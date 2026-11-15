@@ -42,21 +42,43 @@ Todo el código fuente del monorepo se desarrollará en TypeScript bajo modo est
   ```
 
 ### 1.3 Representación y Manejo de Dinero en Código
-Para evitar descalces y pérdida de precisión aritmética por coma flotante IEEE 754:
-- En memoria y en SQLite local, los importes se manipulan estrictamente como **enteros en céntimos** (`type Cents = number`).
-- En Supabase (PostgreSQL), la representación canónica es `NUMERIC(12,2)`.
-- Conversión y utilidades puras obligatorias:
+Para erradicar descalces y pérdida de precisión aritmética por coma flotante IEEE 754:
+- En memoria y en SQLite local, los importes se manipulan estrictamente como **enteros en céntimos** (`type Centavos = number`).
+- En Supabase (PostgreSQL), la representación canónica en base de datos es `NUMERIC(12,2)`.
+- **Conversión Segura desde Cadenas:** Queda prohibido aplicar `Math.round(soles * 100)` directamente sobre tipos numéricos de punto flotante de JavaScript (vulnerables a errores de redondeo como `19.99 * 100 = 1998.9999999999998`). Toda entrada monetaria debe procesarse a partir de cadenas de texto validadas dividiendo parte entera y decimal:
   ```typescript
   export type Centavos = number & { readonly __brand: unique symbol };
 
-  export const toCentavos = (soles: number): Centavos =>
-    Math.round(soles * 100) as Centavos;
+  /**
+   * Parsea de forma segura una cadena monetaria a céntimos enteros sin punto flotante.
+   * Ejemplos válidos: "19.90" -> 1990, "5" -> 500, "0.50" -> 50, "120.5" -> 12050.
+   */
+  export const parseSolesToCentavos = (input: string): Result<Centavos, string> => {
+    const clean = input.trim();
+    const match = clean.match(/^(\d+)(?:\.(\d{1,2}))?$/);
+    if (!match || !match[1]) {
+      return { ok: false, error: 'Formato numérico inválido. Ingrese un monto positivo con hasta 2 decimales.' };
+    }
+    const enteros = parseInt(match[1], 10);
+    const decimalesRaw = match[2] ?? '';
+    const decimales = parseInt(decimalesRaw.padEnd(2, '0'), 10);
+    const totalCentavos = enteros * 100 + decimales;
+    return { ok: true, value: totalCentavos as Centavos };
+  };
 
-  export const toSoles = (centavos: Centavos): number =>
-    centavos / 100;
+  /**
+   * Convierte céntimos enteros a cadena decimal exacta para persistencia en PostgreSQL o visualización.
+   */
+  export const toDecimalString = (centavos: Centavos): string => {
+    const sign = centavos < 0 ? '-' : '';
+    const abs = Math.abs(centavos);
+    const enteros = Math.floor(abs / 100);
+    const dec = (abs % 100).toString().padStart(2, '0');
+    return `${sign}${enteros}.${dec}`;
+  };
 
   export const formatMoneda = (centavos: Centavos): string =>
-    `S/ ${(centavos / 100).toFixed(2)}`;
+    `S/ ${toDecimalString(centavos)}`;
   ```
 
 ---

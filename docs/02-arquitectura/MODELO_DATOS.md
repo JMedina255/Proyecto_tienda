@@ -342,10 +342,10 @@ erDiagram
 - `pedidos_proveedor.proveedor_id` es nullable en su creación inicial (`estado_pedido = 'borrador_sin_asignar'`).
 - En `pedido_detalles`, la columna `edicion_libro_id` es nullable; se registran `descripcion_item` (texto libre ingresado por el vendedor) y `foto_referencia_url` (portada capturada con cámara). Al catalogarse formalmente, se enlaza la edición definitiva.
 
-### 3.3 Pagos Parciales, Entregas Fiadas y Retención (`RN-VTA-003`, `RN-PAG-002`)
+### 3.3 Pagos Parciales: Reservas con Anticipo vs. Entregas Fiadas (`RN-VTA-003`, `RN-PAG-002`, `RN-PAG-004`)
 - Si `total_pagado < total_neto`:
-  - **Mercadería Retenida:** `estado_entrega = 'retenido'`, `estado_pago = 'parcial'`. No requiere autorización de supervisor.
-  - **Entrega Física con Saldo (Fiado):** `estado_entrega = 'entregado_saldo_pendiente'`, `estado_pago = 'parcial'`. Exige obligatoriamente `autorizador_id NOT NULL` vinculado a un registro en `autorizaciones_override`.
+  - **Reserva con Anticipo (Custodia en Tienda):** `estado_entrega = 'retenido'`, `estado_pago = 'parcial'`. Riesgo crediticio nulo para la librería. No requiere autorización de supervisor (puede registrarla directamente el `Vendedor`). Identificación requerida: nombre del cliente (`cliente_nombre`, mín. 3 caracteres) y teléfono de contacto en observaciones o documento para aviso de disponibilidad o caducidad.
+  - **Entrega Física con Saldo Pendiente (Fiado):** `estado_entrega = 'entregado_saldo_pendiente'`, `estado_pago = 'parcial'`. Riesgo crediticio total. Exige obligatoriamente autorización de supervisor (`autorizador_id NOT NULL` vinculado a `autorizaciones_override`) e identificación formal obligatoria con documento oficial de identidad (`cliente_documento`, DNI/CE, mín. 6 caracteres) y nombre completo.
 
 ### 3.4 Operaciones Financieras Inmutables y Conciliación de Caja (`RN-CAJ-004`, `DEC-007`)
 - La tabla `movimientos_caja` es de solo inserción. Los errores se compensan mediante movimientos de contra-asiento de tipo `ajuste_sobrante` o `ajuste_faltante`.
@@ -370,18 +370,20 @@ erDiagram
 - **En SQLite local:** Todo registro de pago se ejecuta dentro de una transacción atómica exclusiva (`BEGIN IMMEDIATE`). El servicio de dominio verifica que $\text{total\_pagado} + \text{nuevo\_abono} \le \text{total\_neto}$; si el abono supera la deuda, la transacción se revierte con error explícito de sobrepago.
 - **En PostgreSQL (Supabase RPC):** Se mitigan condiciones de carrera concurrentes mediante bloqueo pesimista `SELECT ... FOR UPDATE` sobre la cabecera `ventas`, recalculando atómicamente $\text{saldo\_pendiente} = \text{total\_neto} - \sum \text{pagos}$. Si $\text{saldo\_pendiente} < 0$, la función RPC aborta la transacción y registra el intento anómalo en `auditoria_financiera`.
 
-### 3.9 Identificación Mínima Obligatoria de Clientes con Saldo Pendiente (`RN-VTA-003`)
-- Queda prohibida la entrega de mercadería fiada a clientes anónimos.
-- El modelo relacional en PostgreSQL y SQLite impone la restricción de integridad a nivel de tabla:
+### 3.9 Identificación Mínima Obligatoria: Reservas vs. Entregas Fiadas (`RN-VTA-003`, `RN-PAG-002`, `RN-PAG-004`)
+- Queda prohibida la entrega de mercadería fiada a clientes anónimos o sin autorización.
+- El modelo relacional en PostgreSQL y SQLite diferencia las exigencias de identificación según el destino físico del libro:
   ```sql
   CHECK (
-    saldo_pendiente = 0 OR (
-      cliente_nombre IS NOT NULL AND LENGTH(TRIM(cliente_nombre)) >= 3 AND
-      cliente_documento IS NOT NULL AND LENGTH(TRIM(cliente_documento)) >= 6
-    )
+    saldo_pendiente = 0 OR
+    (estado_entrega = 'retenido' AND cliente_nombre IS NOT NULL AND LENGTH(TRIM(cliente_nombre)) >= 3) OR
+    (estado_entrega = 'entregado_saldo_pendiente' AND autorizador_id IS NOT NULL AND
+     cliente_nombre IS NOT NULL AND LENGTH(TRIM(cliente_nombre)) >= 3 AND
+     cliente_documento IS NOT NULL AND LENGTH(TRIM(cliente_documento)) >= 6)
   )
   ```
-- Exige capturar el nombre del cliente y su documento de identidad (DNI/CE) o número telefónico de contacto antes de confirmar la entrega con saldo pendiente.
+- Para **reservas** (`retenido`), se exige nombre identificador para coordinar la entrega física del libro resguardado.
+- Para **fiados** (`entregado_saldo_pendiente`), se exige adicionalmente documento oficial de identidad (`cliente_documento`, DNI/CE) y registro de supervisor (`autorizador_id`).
 
 ---
 

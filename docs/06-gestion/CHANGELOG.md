@@ -6,6 +6,32 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [0.0.10] - 2026-11-15 (Hito H05 — Planificación Técnica y Estrategia de Pruebas)
+
+### Añadido
+- **Plan de Desarrollo Incremental (`docs/05-planificacion/PLAN_DESARROLLO.md`):**
+  - Secuencia de construcción modular en 6 hitos (H06 a H11) priorizando la infraestructura de sincronización base antes de construir ventas y caja: H06 (Monorepo, SQLite y Sync Base - Gate técnico), H07 (Catálogo y OCR), H08 (Caja y Ventas), H09 (Proveedores y Gastos), H10 (Pruebas Integrales Offline y Conciliación) y H11 (Panel Web Administrativo).
+  - Exclusión explícita de facturación electrónica y kardex continuo del alcance del MVP (conforme a `DEC-003` y `DEC-008`).
+  - Matriz compacta de 23 casos de prueba automatizados cubriendo pruebas financieras en céntimos, durabilidad WAL `FULL`, atomicidad transaccional, idempotencia outbox por hash SHA-256, ventas mixtas, fiados, reservas con libro retenido, arqueos de caja, políticas RLS, cifrado local Keystore, listas CRL y resiliencia en modo avión.
+  - Criterios de Aceptación (*Quality Gates*) para cierre de hitos basados en evidencia comprobable: 100% pruebas aprobadas, cero defectos P0/P1, trazabilidad explícita y verificación de seguridad.
+  - Clasificación de decisiones abiertas `DEC-012` a `DEC-018` en Imprescindibles antes de H06 (`DEC-012`, `DEC-014`, `DEC-015`), Necesarias antes de módulos posteriores (`DEC-013`, `DEC-016`, `DEC-018`) y Diferibles (`DEC-017`), con recomendaciones técnicas sin confirmación arbitraria.
+
+### Corregido
+- **Conversión Monetaria Determinista (`docs/03-estandares/ESTANDAR_PROGRAMACION.md`):**
+  - Sustitución de `Math.round(soles * 100)` por la función `parseSolesToCentavos` basada en descomposición de cadenas y aritmética entera exacta sin error de coma flotante IEEE 754.
+- **Seguridad en Replicación de Datos Bancarios (`docs/04-seguridad/HARDENING.md` y `DEC-015` en `DECISIONES.md`):**
+  - Definición del modelo multi-dispositivo sin intercambio de claves privadas: protección central con RLS y Vault en Supabase, transporte TLS 1.3 y cifrado local en SQLite con clave simétrica AES-256-GCM independiente generada en el Android Keystore de cada terminal.
+- **Diferenciación entre Reservas y Fiados (`REGLAS_NEGOCIO.md`, `MODELO_DATOS.md` y `DICCIONARIO_DATOS.md`):**
+  - Reservas con anticipo (`estado_entrega = 'retenido'`): mercadería custodiada en tienda, riesgo nulo, operable por vendedor sin PIN de supervisor, exigiendo nombre y teléfono de contacto.
+  - Fiados con entrega física (`estado_entrega = 'entregado_saldo_pendiente'`): mercadería retirada con saldo, riesgo crediticio total, autorización obligatoria con PIN de supervisor y documento oficial de identidad (DNI/CE).
+  - Refinamiento de restricción `CHECK` a nivel de tabla en `ventas`.
+
+### Cambiado
+- **Actualización de Índices y Estado General:**
+  - `docs/README.md` y `README.md`: Cierre formal de la Fase 1 de diseño (H00 a H05) y posicionamiento del Hito H06 como próximo paso técnico.
+
+---
+
 ## [0.0.9] - 2026-11-15 (Hito H04 — Estándares de Programación y Hardening de Seguridad)
 
 ### Añadido

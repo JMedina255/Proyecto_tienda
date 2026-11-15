@@ -53,10 +53,15 @@ Para garantizar máxima trazabilidad técnica y rigor de auditoría, cada contro
   - Conforme al análisis arquitectónico de [DEC-015](../06-gestion/DECISIONES.md#dec-015-estrategia-de-cifrado-de-base-de-datos-local-sqlite), se evalúa la alternativa de *Cifrado Híbrido por Campos* frente a *SQLCipher*:
     - *SQLCipher:* Ofrece cifrado de página completa pero introduce sobrecarga de rendimiento I/O en hardware modesto, riesgo de corrupción irrecuperable ante fallo del Keystore y complejidad de compilación nativa en Expo.
     - *Cifrado por Campos con AES-256-GCM:* La base de datos SQLite aprovecha el cifrado de almacenamiento del sistema operativo Android (File-Based Encryption - FBE) dentro del sandbox privado; los campos de alta confidencialidad (números de cuenta bancaria de proveedores `numero_cuenta_cifrado`, PINs y hashes de sesión) se cifran a nivel de aplicación con AES-256-GCM utilizando claves generadas y resguardadas en el Android Keystore (`expo-secure-store`).
-  - *Ciclo de Vida de Claves:*
+  - *Arquitectura de Acceso Multi-dispositivo a Datos Bancarios Replicados:*
+    - En el servidor central (PostgreSQL en Supabase), las cuentas bancarias de proveedores se almacenan protegidas por políticas RLS estrictas (solo accesibles para roles `Dueño` y `Administrador`; el rol `Vendedor` recibe siempre `NULL` o campos filtrados). En reposo en la nube, se resguardan mediante Supabase Vault / `pgcrypto`.
+    - La replicación hacia los dispositivos móviles autorizados se efectúa bajo canal cifrado TLS 1.3 con token GoTrue autenticado.
+    - En cada dispositivo cliente autorizado (`Dueño` o `Administrador`), la aplicación recibe el dato descifrado por el canal TLS y lo cifra inmediatamente antes de escribirlo en su SQLite local con la clave simétrica AES-256-GCM generada en el Android Keystore propio de dicho hardware.
+    - **Cero intercambio de claves privadas:** Cada terminal móvil mantiene su propia clave simétrica en Keystore; ninguna clave de cifrado local se comparte ni transmite por la red entre dispositivos.
+  - *Ciclo de Vida de Claves Locales:*
     - *Generación:* Clave maestra AES de 256 bits generada por hardware en Android Keystore en la primera inicialización de la app.
     - *Rotación:* Al renovar credenciales o cada 90 días, los campos sensibles se recifran con una nueva clave derivada, retirando la clave anterior tras validar la reescritura.
-    - *Recuperación:* Ante pérdida de clave local o reinstalación del dispositivo, los datos sensibles maestros se restauran mediante re-sincronización autenticada desde Supabase, evitando la pérdida catastrófica de base de datos asociada a SQLCipher.
+    - *Recuperación:* Ante pérdida de clave local o sustitución de terminal, los datos bancarios y maestros se restauran de forma segura mediante re-sincronización autenticada desde Supabase, eliminando el riesgo de pérdida total inherente a SQLCipher.
 - **SEC-DATA-002 (Aislamiento de almacenamiento sandbox de la aplicación):**
   - La base de datos SQLite y las imágenes en caché deben ubicarse estrictamente en el directorio privado de la aplicación (`Context.getFilesDir()`), bloqueado para aplicaciones externas sin privilegios root.
 - **SEC-DATA-003 (Limpieza de archivos temporales de cámara y OCR):**
