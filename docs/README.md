@@ -13,14 +13,14 @@ Este directorio centraliza la documentación arquitectónica, técnica, de reque
 | `01-requerimientos/` | [SRS.md](01-requerimientos/SRS.md) | Especificación de Requerimientos de Software (IEEE 830 / ISO 29148): 11 módulos, 45 RFs, 14 CUs, RNF y matriz de trazabilidad. | **Consolidado / Simplificado en H01.1** |
 | `01-requerimientos/` | [REGLAS_NEGOCIO.md](01-requerimientos/REGLAS_NEGOCIO.md) | Políticas comerciales, reglas de mostrador, cajas, créditos, estados compatibles y RBAC (27 reglas: 26 confirmadas + 1 propuesta). | **Consolidado / Simplificado en H01.1** |
 | `02-arquitectura/` | [ARQUITECTURA.md](02-arquitectura/ARQUITECTURA.md) | Diseño de la solución, monorepo, arquitectura móvil, persistencia SQLite, pipeline OCR y sincronización offline anti-LWW. | **Consolidado / Corregido en H02.1** |
-| `02-arquitectura/` | [MODELO_DATOS.md](02-arquitectura/MODELO_DATOS.md) | Entidades candidatas, relaciones, esquema relacional preliminar y convenciones relacionales. | **Estructura base / Sujeto a H03** |
+| `02-arquitectura/` | [MODELO_DATOS.md](02-arquitectura/MODELO_DATOS.md) | Modelo relacional estructurado por dominios, diagramas ERD, resolución de escenarios offline y matriz de persistencia. | **Consolidado / Refinado en H03** |
 | `03-estandares/` | [ESTANDAR_DOCUMENTACION.md](03-estandares/ESTANDAR_DOCUMENTACION.md) | Estándar de documentación concisa, verificable y trazable; directrices de redacción y tablas compactas. | **Vigente / Activo (H01.1)** |
 | `03-estandares/` | [ESTANDAR_PROGRAMACION.md](03-estandares/ESTANDAR_PROGRAMACION.md) | Convenciones de TypeScript, React Native, React, testing, estructura modular y linters. | **Estructura base / Sujeto a H04** |
-| `03-estandares/` | [DICCIONARIO_DATOS.md](03-estandares/DICCIONARIO_DATOS.md) | Estructura formal y catálogo detallado de tablas, columnas, tipos, claves y restricciones. | **Estructura base / Sujeto a H03** |
+| `03-estandares/` | [DICCIONARIO_DATOS.md](03-estandares/DICCIONARIO_DATOS.md) | Especificación y catálogo de 26 tablas, tipos PostgreSQL/SQLite, claves, restricciones e integridad financiera. | **Consolidado / Refinado en H03** |
 | `04-seguridad/` | [HARDENING.md](04-seguridad/HARDENING.md) | Línea base de seguridad, RLS, cifrado local, protección de storage y controles de sincronización. | **Actualizado en H02.1 / Sujeto a H04** |
-| `05-planificacion/` | [PLAN_DESARROLLO.md](05-planificacion/PLAN_DESARROLLO.md) | Cronograma de fases e hitos (H00 a H06+), dependencias, criterios de aceptación y entregables Git. Ubicado exclusivamente en `docs/05-planificacion/`. | **Actualizado / Vigente H02.1** |
+| `05-planificacion/` | [PLAN_DESARROLLO.md](05-planificacion/PLAN_DESARROLLO.md) | Cronograma de fases e hitos (H00 a H06+), dependencias, criterios de aceptación y entregables Git. Ubicado exclusivamente en `docs/05-planificacion/`. | **Actualizado / Vigente H03** |
 | `06-gestion/` | [DECISIONES.md](06-gestion/DECISIONES.md) | Registro de Decisiones de Arquitectura (ADR) con estados (Confirmado, Propuesto, Pendiente). | **Vigente / Actualizado H02.1** |
-| `06-gestion/` | [CHANGELOG.md](06-gestion/CHANGELOG.md) | Historial de versiones del repositorio documental y técnico. | **Vigente / Versión 0.0.7** |
+| `06-gestion/` | [CHANGELOG.md](06-gestion/CHANGELOG.md) | Historial de versiones del repositorio documental y técnico. | **Vigente / Versión 0.0.8** |
 
 ---
 

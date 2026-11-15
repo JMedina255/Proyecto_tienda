@@ -6,6 +6,26 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [0.0.8] - 2026-11-15 (Hito H03 — Diseño del Modelo y Diccionario de Datos)
+
+### Añadido
+- **Consolidación del Modelo Relacional (`docs/02-arquitectura/MODELO_DATOS.md`):**
+  - Estructuración del modelo en 3 dominios complementarios con diagramas ERD Mermaid legibles: Catálogo y Proveedores, Ventas y Tesorería, y Sincronización y Auditoría.
+  - Diseño de 26 entidades normalizadas con claves primarias UUID v4 descentralizadas, marcas de tiempo UTC monotónicas y soporte de trazabilidad multi-dispositivo con `dispositivo_id`.
+  - Especificación de soluciones de datos para escenarios críticos: ventas rápidas sin detalles inmediatos, pedidos de libros no catalogados con foto y texto libre, pagos parciales con mercadería retenida o entregada con saldo (fiado), operaciones financieras inmutables append-only y conciliación asíncrona de cierres de caja provisionales.
+  - Clasificación explícita de persistencia: 22 tablas replicadas (PostgreSQL + SQLite), 3 tablas exclusivas de SQLite móvil (`sync_outbox`, `usuarios_sesion_local`, `credenciales_revocadas_local`) y 2 tablas exclusivas de PostgreSQL central (`sync_processed_mutations`, `auditoria_financiera`).
+- **Diccionario de Datos Exhaustivo (`docs/03-estandares/DICCIONARIO_DATOS.md`):**
+  - Catálogo completo de las 26 entidades del sistema documentando nombre, propósito, tipos equivalentes PostgreSQL/SQLite, nulabilidad, restricciones `CHECK`, unicidad, claves foráneas e índices.
+  - Convenciones unificadas para identificadores UUID v4, importes monetarios exactos (`NUMERIC(12,2)` / dos decimales redondeados), marcas de tiempo UTC (`TIMESTAMPTZ` / ISO-8601), fechas comerciales locales (`DATE` / `YYYY-MM-DD`) y estados enums validados.
+  - Matriz de integridad y restricciones financieras anti-LWW que previene pagos duplicados, importes negativos, ventas sin trazabilidad, abonos que excedan la deuda y descuadres contables.
+
+### Cambiado
+- **Actualización de Gobernanza y Planificación:**
+  - `docs/05-planificacion/PLAN_DESARROLLO.md`: Registro de H03 como completado y activación formal de H04 (Estándares de Programación y Hardening de Seguridad).
+  - `docs/README.md` y `README.md`: Actualización del estado de avance hacia el hito H04.
+
+---
+
 ## [0.0.7] - 2026-11-15 (Hito H02.1 — Correcciones Críticas de Arquitectura)
 
 ### Añadido

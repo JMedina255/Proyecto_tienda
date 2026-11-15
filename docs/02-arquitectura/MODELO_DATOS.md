@@ -1,54 +1,52 @@
-# Modelo de Datos Preliminar (MODELO_DATOS.md)
+# Modelo de Datos Relacional y Estrategia de Persistencia (MODELO_DATOS.md)
 
-**Proyecto:** Sistema de Gestión de Librería — Proyecto Tienda  
-**Documento:** MODELO_DATOS.md  
-**Estado:** Modelo preliminar / Candidato para H00  
-**Trazabilidad:** [../01-requerimientos/SRS.md](../01-requerimientos/SRS.md) | [../01-requerimientos/REGLAS_NEGOCIO.md](../01-requerimientos/REGLAS_NEGOCIO.md) | [../06-gestion/DECISIONES.md](../06-gestion/DECISIONES.md)
-
----
-
-## 1. Principios de Diseño Relacional
-
-1. **Descentralización de Claves Primarias:** Todas las tablas utilizan como clave primaria identificadores universales únicos **UUID v4** generados en el dispositivo cliente, garantizando la inserción concurrente y autónoma sin colisiones en modo *offline* (ref: [DEC-009](../06-gestion/DECISIONES.md#dec-009-arquitectura-offline-first-con-sqlite-local-y-supabase-remoto)).
-2. **Homogeneidad entre SQLite y PostgreSQL:** Las tablas locales en SQLite tendrán una estructura equivalente a las tablas centrales en PostgreSQL de Supabase, facilitando la replicación directa de esquemas.
-3. **Auditoría y Borrado Lógico:** Cada registro incluye marcas de tiempo UTC (`created_at`, `updated_at`), versión de registro (`sync_version`) y soporte para eliminación lógica (`deleted_at`) para propagar bajas sin pérdida de integridad referencial.
-4. **Desacoplamiento Bibliográfico:** Se separa el título base (`libros`) de sus variantes físicas y comerciales (`ediciones_libro`) para reflejar fielmente la condición de libros nuevos y usados (ref: [DEC-004](../06-gestion/DECISIONES.md#dec-004-desacoplamiento-de-título-respecto-a-ediciones-y-estados-de-conservación)).
+**Proyecto:** Sistema de Gestión de Librería — Proyecto Tienda<br>
+**Documento:** MODELO_DATOS.md<br>
+**Estado:** Consolidado y Refinado en H03<br>
+**Trazabilidad:** [../01-requerimientos/SRS.md](../01-requerimientos/SRS.md) | [../01-requerimientos/REGLAS_NEGOCIO.md](../01-requerimientos/REGLAS_NEGOCIO.md) | [ARQUITECTURA.md](ARQUITECTURA.md) | [../03-estandares/DICCIONARIO_DATOS.md](../03-estandares/DICCIONARIO_DATOS.md)
 
 ---
 
-## 2. Diagrama Entidad-Relación Preliminar (ERD)
+## 1. Principios de Diseño Relacional e Integridad Offline
+
+1. **Claves Primarias Descentralizadas:** Todas las tablas utilizan **UUID v4** generados en el cliente como clave primaria, permitiendo inserciones concurrentes y autónomas sin dependencia de red ni colisiones ([DEC-009](../06-gestion/DECISIONES.md#dec-009-arquitectura-offline-first-con-sqlite-local-y-supabase-remoto)).
+2. **Inmutabilidad de Ledgers Financieros (Anti-LWW):** Las tablas de transacciones (`ventas`, `pagos_venta`, `movimientos_caja`, `abonos_proveedor`) operan bajo un modelo **Append-Only**. Se prohíben mutaciones destructivas (`UPDATE`/`DELETE`) sobre importes o medios de pago; toda corrección o anulación se registra como un nuevo asiento contrapartida auditable.
+3. **Idempotencia Estricta por Hash:** Cada mutación o pago incluye un campo `idempotency_key` (`SHA256(dispositivo_id + entidad_id + operacion + timestamp)`). PostgreSQL impone una restricción única (`UNIQUE`) que impide duplicidades financieras ante reintentos de red.
+4. **Trazabilidad Multi-dispositivo:** Todo registro de negocio incluye `dispositivo_id` (UUID de hardware/instalación) y `usuario_id`, garantizando auditoría del origen de cada transacción.
+5. **Eliminación Lógica (*Soft Deletes*):** Tablas de catálogo, proveedores y maestros incorporan `deleted_at (TIMESTAMPTZ NULL)`. Las bajas lógicas se propagan como mutaciones de actualización, preservando la integridad referencial histórica.
+6. **Desacoplamiento Bibliográfico:** Separación estricta entre la obra intelectual (`libros`), sus variantes físicas y de conservación (`ediciones_libro`) y la clasificación temática (`categorias`, `libro_categoria`) ([DEC-004](../06-gestion/DECISIONES.md#dec-004-desacoplamiento-de-título-respecto-a-ediciones-y-estados-de-conservación)).
+7. **Durabilidad SQLite Diferenciada:** Cumpliendo la directriz de H02.1, SQLite aplica `PRAGMA synchronous = FULL` en transacciones financieras críticas para asegurar persistencia física (*fsync*) en disco, y `NORMAL` en consultas de catálogo.
+
+---
+
+## 2. Diagramas Entidad-Relación (ERD)
+
+Para garantizar legibilidad visual conforme al estándar, el modelo se segrega en tres dominios complementarios.
+
+### 2.1 Dominio 1: Catálogo Bibliográfico, Proveedores y Compras
 
 ```mermaid
 erDiagram
-    USUARIOS ||--o{ SESIONES_CAJA : "abre/cierra"
-    USUARIOS ||--o{ VENTAS : "registra como vendedor"
-    USUARIOS ||--o{ VENTAS : "autoriza fiado"
-    USUARIOS ||--o{ GASTOS : "registra"
-
+    CATEGORIAS ||--o{ LIBRO_CATEGORIA : "clasifica"
+    LIBROS ||--o{ LIBRO_CATEGORIA : "pertenece a"
     LIBROS ||--|{ EDICIONES_LIBRO : "tiene ediciones"
-    PROVEEDORES ||--o{ LIBRO_PROVEEDOR : "suministra"
+
+    PROVEEDORES ||--o{ CUENTAS_BANCARIAS_PROVEEDOR : "registra cuentas"
+    PROVEEDORES ||--o{ LIBRO_PROVEEDOR : "cotiza"
     EDICIONES_LIBRO ||--o{ LIBRO_PROVEEDOR : "ofrecida por"
 
-    SESIONES_CAJA ||--o{ MOVIMIENTOS_CAJA : "contiene"
-    SESIONES_CAJA ||--o{ VENTAS : "asociada a"
-    SESIONES_CAJA ||--o{ GASTOS : "imputa egresos"
-
-    VENTAS ||--|{ VENTA_DETALLES : "desglosa"
-    EDICIONES_LIBRO ||--o{ VENTA_DETALLES : "incluida en"
-    VENTAS ||--|{ PAGOS_VENTA : "recibe pagos"
-
-    PROVEEDORES ||--o{ PEDIDOS_PROVEEDOR : "atiende"
+    PROVEEDORES ||--o{ PEDIDOS_PROVEEDOR : "suministra"
     PEDIDOS_PROVEEDOR ||--|{ PEDIDO_DETALLES : "contiene ítems"
-    EDICIONES_LIBRO ||--o{ PEDIDO_DETALLES : "solicitada en"
-    PROVEEDORES ||--o{ ABONOS_PROVEEDOR : "recibe abonos"
-    PEDIDOS_PROVEEDOR ||--o{ ABONOS_PROVEEDOR : "vinculado a"
+    EDICIONES_LIBRO ||--o{ PEDIDO_DETALLES : "solicitada en (opcional)"
 
-    USUARIOS {
+    PEDIDOS_PROVEEDOR ||--o{ RECEPCIONES_PEDIDO : "recibe entregas"
+    PROVEEDORES ||--o{ ABONOS_PROVEEDOR : "recibe pagos"
+    PEDIDOS_PROVEEDOR ||--o{ ABONOS_PROVEEDOR : "amortiza (opcional)"
+
+    CATEGORIAS {
         uuid id PK
-        uuid auth_id FK
-        string rol
         string nombre
-        string email
+        string codigo
         boolean activo
     }
 
@@ -57,10 +55,8 @@ erDiagram
         string titulo
         string autor
         string editorial
-        string isbn
-        text sinopsis
-        timestamp created_at
-        timestamp updated_at
+        string isbn_referencial
+        timestamp deleted_at
     }
 
     EDICIONES_LIBRO {
@@ -72,8 +68,7 @@ erDiagram
         string estado_conservacion
         decimal precio_referencial
         string portada_url
-        timestamp created_at
-        timestamp updated_at
+        timestamp deleted_at
     }
 
     PROVEEDORES {
@@ -82,8 +77,17 @@ erDiagram
         string contacto
         string telefono
         string email
-        string direccion
         boolean activo
+        timestamp deleted_at
+    }
+
+    CUENTAS_BANCARIAS_PROVEEDOR {
+        uuid id PK
+        uuid proveedor_id FK
+        string banco
+        string tipo_cuenta
+        string numero_cuenta_cifrado
+        string titular_cifrado
     }
 
     LIBRO_PROVEEDOR {
@@ -94,10 +98,90 @@ erDiagram
         string codigo_proveedor
     }
 
+    PEDIDOS_PROVEEDOR {
+        uuid id PK
+        uuid proveedor_id FK "nullable inicialmente"
+        uuid dispositivo_id
+        string estado_pedido
+        decimal total_estimado
+        timestamp fecha_solicitud
+    }
+
+    PEDIDO_DETALLES {
+        uuid id PK
+        uuid pedido_id FK
+        uuid edicion_libro_id FK "nullable para no catalogados"
+        string descripcion_item
+        string foto_referencia_url
+        int cantidad_solicitada
+        int cantidad_recibida
+        decimal costo_unitario
+    }
+
+    RECEPCIONES_PEDIDO {
+        uuid id PK
+        uuid pedido_id FK
+        uuid dispositivo_id
+        uuid usuario_id
+        string numero_guia
+        timestamp fecha_recepcion
+    }
+
+    ABONOS_PROVEEDOR {
+        uuid id PK
+        uuid proveedor_id FK
+        uuid pedido_id FK "nullable"
+        uuid sesion_caja_id FK "nullable"
+        uuid dispositivo_id
+        decimal monto
+        string medio_pago
+        string idempotency_key UQ
+    }
+```
+
+### 2.2 Dominio 2: Ventas, Cobros, Tesorería y Caja
+
+```mermaid
+erDiagram
+    USUARIOS ||--o{ SESIONES_CAJA : "abre/cierra"
+    USUARIOS ||--o{ VENTAS : "registra como vendedor"
+    USUARIOS ||--o{ AUTORIZACIONES_OVERRIDE : "autoriza como supervisor"
+
+    SESIONES_CAJA ||--o{ MOVIMIENTOS_CAJA : "registra flujo efectivo"
+    SESIONES_CAJA ||--o{ ARQUEOS_DETALLE : "desglosa conteo físico"
+    SESIONES_CAJA ||--o{ VENTAS : "contiene ventas"
+    SESIONES_CAJA ||--o{ GASTOS : "imputa egresos"
+
+    VENTAS ||--|{ VENTA_DETALLES : "desglosa ítems (nullable venta rápida)"
+    EDICIONES_LIBRO ||--o{ VENTA_DETALLES : "referencia edición"
+    VENTAS ||--|{ PAGOS_VENTA : "recibe pagos"
+    VENTAS ||--o{ AUTORIZACIONES_OVERRIDE : "justifica fiado/anulación"
+
+    USUARIOS {
+        uuid id PK
+        uuid auth_id FK
+        string rol
+        string nombre
+        string email
+        boolean activo
+    }
+
+    AUTORIZACIONES_OVERRIDE {
+        uuid id PK
+        string operacion_tipo
+        uuid entidad_id
+        uuid autorizador_id FK
+        uuid dispositivo_id
+        string metodo
+        string firma_hmac
+        timestamp caducidad_at
+    }
+
     SESIONES_CAJA {
         uuid id PK
+        uuid dispositivo_id
         uuid usuario_apertura_id FK
-        uuid usuario_cierre_id FK
+        uuid usuario_cierre_id FK "nullable"
         decimal monto_inicial
         decimal monto_final_calculado
         decimal monto_final_declarado
@@ -107,23 +191,44 @@ erDiagram
         timestamp fecha_cierre
     }
 
+    ARQUEOS_DETALLE {
+        uuid id PK
+        uuid sesion_caja_id FK
+        string medio_pago
+        decimal monto_contado
+    }
+
     MOVIMIENTOS_CAJA {
         uuid id PK
         uuid sesion_caja_id FK
+        uuid dispositivo_id
         string tipo_movimiento
         decimal monto
         string medio_pago
-        string motivo
-        timestamp created_at
+        string idempotency_key UQ
+    }
+
+    GASTOS {
+        uuid id PK
+        uuid sesion_caja_id FK
+        uuid dispositivo_id
+        uuid usuario_id FK
+        string categoria
+        decimal monto
+        boolean afecta_caja_efectivo
+        string comprobante_url
+        string idempotency_key UQ
     }
 
     VENTAS {
         uuid id PK
         uuid sesion_caja_id FK
         uuid vendedor_id FK
-        uuid autorizador_id FK
-        string cliente_nombre
-        string cliente_documento
+        uuid autorizador_id FK "nullable"
+        uuid dispositivo_id
+        string tipo_venta
+        string serie
+        int correlativo
         decimal total_bruto
         decimal total_descuentos
         decimal total_neto
@@ -132,16 +237,15 @@ erDiagram
         string estado_venta
         string estado_pago
         string estado_entrega
-        boolean es_venta_rapida
-        string foto_comprobante_url
-        string sync_status
-        timestamp created_at
+        string estado_regularizacion
+        string foto_soporte_url
+        string idempotency_key UQ
     }
 
     VENTA_DETALLES {
         uuid id PK
         uuid venta_id FK
-        uuid edicion_libro_id FK
+        uuid edicion_libro_id FK "nullable si venta rápida"
         string descripcion_item
         int cantidad
         decimal precio_unitario
@@ -152,107 +256,133 @@ erDiagram
     PAGOS_VENTA {
         uuid id PK
         uuid venta_id FK
+        uuid sesion_caja_id FK
+        uuid dispositivo_id
+        uuid usuario_id FK
         decimal monto
         string medio_pago
         string referencia_pago
+        string idempotency_key UQ
         timestamp fecha_pago
     }
+```
 
-    GASTOS {
+### 2.3 Dominio 3: Sincronización, Multimedia y Auditoría Central
+
+```mermaid
+erDiagram
+    SYNC_OUTBOX ||--o{ ARCHIVOS_MULTIMEDIA : "referencia subidas pendientes"
+
+    ARCHIVOS_MULTIMEDIA {
         uuid id PK
-        uuid sesion_caja_id FK
-        string categoria
-        decimal monto
-        boolean afecta_caja_efectivo
-        string comprobante_url
-        string descripcion
-        timestamp fecha_gasto
+        string entidad_tipo
+        uuid entidad_id
+        string bucket
+        string path_remoto
+        string uri_local
+        string hash_sha256
+        int tamano_bytes
+        string sync_status
     }
 
-    PEDIDOS_PROVEEDOR {
+    SYNC_OUTBOX {
         uuid id PK
-        uuid proveedor_id FK
-        string estado_pedido
-        timestamp fecha_solicitud
-        timestamp fecha_estimada
-        decimal total_estimado
-        text observaciones
+        string entity_type
+        uuid entity_id
+        string operation
+        text payload
+        string idempotency_key UQ
+        string status
+        int retry_count
+        timestamp created_at
     }
 
-    PEDIDO_DETALLES {
+    SYNC_PROCESSED_MUTATIONS {
         uuid id PK
-        uuid pedido_id FK
-        uuid edicion_libro_id FK
-        string descripcion_libro
-        int cantidad_solicitada
-        int cantidad_recibida
-        decimal costo_unitario
+        string idempotency_key UQ
+        uuid dispositivo_id
+        uuid usuario_id
+        string entity_type
+        uuid entity_id
+        string operation
+        timestamp processed_at
     }
 
-    ABONOS_PROVEEDOR {
+    AUDITORIA_FINANCIERA {
         uuid id PK
-        uuid proveedor_id FK
-        uuid pedido_id FK
-        decimal monto
-        string medio_pago
-        string comprobante_url
-        timestamp fecha_abono
+        string entidad_tipo
+        uuid entidad_id
+        uuid dispositivo_id
+        uuid usuario_id
+        string tipo_evento
+        decimal monto_impactado
+        decimal balance_resultante
+        jsonb metadata_json
+        timestamp created_at
     }
 ```
 
 ---
 
-## 3. Catálogo de Entidades Candidatas
+## 3. Resolución de Escenarios Críticos de Negocio y Datos
 
-### 3.1 Módulo de Identidad y Acceso
-- **`usuarios`**: Almacena el perfil operativo del personal en la librería, vinculado al `auth.users` de Supabase a través de `auth_id`.
-  - Roles admitidos: `'admin'`, `'dueno'`, `'vendedor'`.
+### 3.1 Ventas Rápidas sin Detalles Iniciales (`RN-VTA-002`, `DEC-011`)
+- La cabecera `ventas` se inserta con `tipo_venta = 'rapida'`, `estado_regularizacion = 'pendiente'` y `foto_soporte_url` apuntando a la fotografía local.
+- No se fuerza la creación inmediata de registros en `venta_detalles`.
+- La regularización posterior inserta los renglones correspondientes en `venta_detalles` asociando las `ediciones_libro` identificadas y actualiza `estado_regularizacion = 'completada'`.
 
-### 3.2 Módulo de Catálogo Bibliográfico
-- **`libros`**: Representa la obra intelectual independientemente de su tiraje o estado físico.
-  - Atributos clave: `id`, `titulo`, `autor`, `editorial`, `isbn`, `sinopsis`.
-- **`ediciones_libro`**: Representa la variante física comercializable de un libro.
-  - Atributos clave: `id`, `libro_id`, `edicion` (ej. "1ra ed.", "Conmemorativa"), `formato` (ej. "Tapa dura", "Bolsillo"), `estado_conservacion` (`'nuevo'`, `'usado'`), `precio_referencial`, `portada_url`.
-- **`libro_proveedor`**: Tabla asociativa entre una edición de libro y un distribuidor/proveedor.
-  - Atributos clave: `edicion_libro_id`, `proveedor_id`, `costo_referencial`, `codigo_proveedor`.
+### 3.2 Pedidos de Libros Faltantes No Catalogados (`RN-PED-003`)
+- `pedidos_proveedor.proveedor_id` es nullable en su creación inicial (`estado_pedido = 'borrador_sin_asignar'`).
+- En `pedido_detalles`, la columna `edicion_libro_id` es nullable; se registran `descripcion_item` (texto libre ingresado por el vendedor) y `foto_referencia_url` (portada capturada con cámara). Al catalogarse formalmente, se enlaza la edición definitiva.
 
-### 3.3 Módulo de Tesorería y Caja
-- **`sesiones_caja`**: Controla el ciclo de vida de un turno o jornada de mostrador.
-  - Atributos clave: `monto_inicial`, `monto_final_calculado`, `monto_final_declarado`, `diferencia`, `estado_caja` (`'abierta'`, `'cierre_provisorio_offline'`, `'cerrada_conciliada'`).
-- **`movimientos_caja`**: Registro granular de entradas y salidas de efectivo dentro de la sesión de caja activa.
-  - Atributos clave: `tipo_movimiento` (`'ingreso_venta'`, `'egreso_gasto'`, `'retiro_propietario'`, `'ingreso_extra'`), `monto`, `medio_pago`.
+### 3.3 Pagos Parciales, Entregas Fiadas y Retención (`RN-VTA-003`, `RN-PAG-002`)
+- Si `total_pagado < total_neto`:
+  - **Mercadería Retenida:** `estado_entrega = 'retenido'`, `estado_pago = 'parcial'`. No requiere autorización de supervisor.
+  - **Entrega Física con Saldo (Fiado):** `estado_entrega = 'entregado_saldo_pendiente'`, `estado_pago = 'parcial'`. Exige obligatoriamente `autorizador_id NOT NULL` vinculado a un registro en `autorizaciones_override`.
 
-### 3.4 Módulo de Ventas y Cobranzas
-- **`ventas`**: Encabezado de la transacción comercial en mostrador.
-  - Atributos clave: `total_bruto`, `total_descuentos`, `total_neto`, `total_pagado`, `saldo_pendiente`.
-  - Estados: `estado_venta` (`'borrador'`, `'completada'`, `'pendiente_regularizacion'`, `'pendiente_cobro'`, `'anulada'`), `estado_pago` (`'pendiente'`, `'parcial'`, `'total'`, `'anulado'`), `estado_entrega` (`'retenido'`, `'entregado_total'`, `'entregado_saldo_pendiente'`).
-  - Atributos de venta rápida: `es_venta_rapida` (boolean), `foto_comprobante_url`.
-  - Atributos de autorización: `autorizador_id` (nullable, requerido si `saldo_pendiente > 0` y se entrega el libro).
-- **`venta_detalles`**: Ítems incluidos en la venta.
-  - Atributos clave: `edicion_libro_id` (nullable temporalmente en ventas rápidas), `descripcion_item`, `cantidad`, `precio_unitario`, `descuento`, `subtotal`.
-- **`pagos_venta`**: Registro individual de cada abono o pago recibido para una venta.
-  - Atributos clave: `monto`, `medio_pago` (`'efectivo'`, `'tarjeta_pos'`, `'billetera_digital'`), `referencia_pago`.
+### 3.4 Operaciones Financieras Inmutables y Conciliación de Caja (`RN-CAJ-004`, `DEC-007`)
+- La tabla `movimientos_caja` es de solo inserción. Los errores se compensan mediante movimientos de contra-asiento de tipo `ajuste_sobrante` o `ajuste_faltante`.
+- En cierres offline, `sesiones_caja` se inserta con `estado_caja = 'cierre_provisorio_offline'`. La función central de conciliación evalúa:
+  $$\Delta_{\text{caja}} = \text{monto\_final\_declarado} - (\text{monto\_inicial} + \sum \text{ingresos\_efectivo} - \sum \text{egresos\_efectivo})$$
+  Transicionando a `conciliado_conforme` ($\Delta = 0$) o `conciliado_con_diferencia` ($\Delta \neq 0$) bajo aprobación del Administrador.
 
-### 3.5 Módulo de Egresos Operativos
-- **`gastos`**: Registro de desembolsos no asociados a compra de libros (servicios, alquiler, suministros).
-  - Atributos clave: `categoria` (`'alquiler'`, `'servicios'`, `'suministros'`, `'personal'`, `'otros'`), `monto`, `afecta_caja_efectivo`, `comprobante_url`.
+### 3.5 Operaciones Multi-dispositivo y Deduplicación
+- Todo dispositivo Android posee un `dispositivo_id` unívoco persistido en Keystore.
+- La tabla central `sync_processed_mutations` en PostgreSQL mantiene un índice único sobre `idempotency_key`. Cualquier intento de reenvío por reconexión es descartado de forma idempotente sin duplicar pagos ni ventas.
 
-### 3.6 Módulo de Proveedores y Compras
-- **`proveedores`**: Catálogo de editoriales, distribuidoras y particulares.
-  - Atributos clave: `nombre`, `contacto`, `telefono`, `email`, `direccion`, `activo`.
-- **`pedidos_proveedor`**: Órdenes de reposición o pedidos de libros faltantes.
-  - Atributos clave: `proveedor_id` (nullable inicialmente para pedidos de faltantes sin asignar), `estado_pedido` (`'borrador_sin_asignar'`, `'asignado'`, `'enviado'`, `'recepcion_parcial'`, `'recibido_total'`, `'cancelado'`).
-- **`pedido_detalles`**: Libros y cantidades solicitadas/recibidas en un pedido.
-  - Atributos clave: `cantidad_solicitada`, `cantidad_recibida`, `costo_unitario`.
-- **`abonos_proveedor`**: Pagos parciales o totales efectuados a distribuidores.
-  - Atributos clave: `proveedor_id`, `pedido_id` (nullable), `monto`, `medio_pago`, `comprobante_url`.
-
-### 3.7 Módulo de Sincronización Local (Específico de SQLite)
-- **`sync_outbox`**: Cola de mutaciones generadas localmente para transmisión asíncrona hacia Supabase.
-  - Atributos clave: `id` (UUID), `tabla_origen`, `operacion` (`'INSERT'`, `'UPDATE'`, `'DELETE'`), `payload` (JSON texto), `client_timestamp` (UTC), `sync_status` (`'pending'`, `'in_flight'`, `'failed'`, `'synced'`), `retry_count`.
+### 3.6 Eliminación Lógica y Auditoría
+- Se prohíbe el borrado físico (`DELETE`) en catálogo y proveedores. La columna `deleted_at` almacena la marca UTC de baja lógica.
+- Las consultas activas filtran `WHERE deleted_at IS NULL`. La sincronización transmite la mutación `UPDATE ... SET deleted_at = ...` garantizando coherencia en todos los clientes.
 
 ---
 
-## 4. Estado del Documento y Próximos Pasos
+## 4. Matriz de Entidades y Estrategia de Persistencia
 
-Este modelo es **preliminar**. No se han generado tablas ni migraciones físicas en este hito (ref: H00 - Restricciones). En el hito **H01** se procederá a la definición formal de los tipos TypeScript y los esquemas DDL en `DICCIONARIO_DATOS.md`.
+| Entidad / Tabla | Persistencia | Propósito / Dominio | Motor Primario |
+| :--- | :---: | :--- | :--- |
+| `usuarios` | Replicada | Perfil de operadores y asignación de roles. | PostgreSQL (Supabase) + SQLite |
+| `autorizaciones_override` | Replicada | Bitácora de autorizaciones supervisor offline/online. | PostgreSQL + SQLite |
+| `usuarios_sesion_local` | Exclusiva SQLite | Caché de sesión local, PIN y tokens biométricos. | SQLite local |
+| `credenciales_revocadas_local`| Exclusiva SQLite | Lista de revocación local (CRL) sincronizada. | SQLite local |
+| `categorias` | Replicada | Familias y géneros bibliográficos. | PostgreSQL + SQLite |
+| `libros` | Replicada | Obras intelectuales base (título, autor, ISBN). | PostgreSQL + SQLite |
+| `libro_categoria` | Replicada | Clasificación temática N:M. | PostgreSQL + SQLite |
+| `ediciones_libro` | Replicada | Variantes físicas, formatos y estados nuevo/usado. | PostgreSQL + SQLite |
+| `proveedores` | Replicada | Directorio de distribuidores y editoriales. | PostgreSQL + SQLite |
+| `cuentas_bancarias_proveedor` | Replicada | Cuentas bancarias cifradas con AES-256 (`RN-PRV-002`). | PostgreSQL + SQLite |
+| `libro_proveedor` | Replicada | Historial de costos variables y códigos proveedor. | PostgreSQL + SQLite |
+| `pedidos_proveedor` | Replicada | Órdenes de abastecimiento y pedidos faltantes. | PostgreSQL + SQLite |
+| `pedido_detalles` | Replicada | Renglones de pedidos (catalogados o texto libre). | PostgreSQL + SQLite |
+| `recepciones_pedido` | Replicada | Registro de recepciones fraccionadas con guía. | PostgreSQL + SQLite |
+| `abonos_proveedor` | Replicada | Egresos y amortizaciones de deuda a proveedores. | PostgreSQL + SQLite |
+| `sesiones_caja` | Replicada | Control de apertura, turno, arqueo y cierre. | PostgreSQL + SQLite |
+| `arqueos_detalle` | Replicada | Desglose físico del conteo por medio de pago. | PostgreSQL + SQLite |
+| `movimientos_caja` | Replicada | Ledger append-only de entradas y salidas de efectivo. | PostgreSQL + SQLite |
+| `gastos` | Replicada | Egresos operativos y comprobantes de mostrador. | PostgreSQL + SQLite |
+| `ventas` | Replicada | Cabecera comercial de ventas normales y rápidas. | PostgreSQL + SQLite |
+| `venta_detalles` | Replicada | Ítems vendidos y subtotales acordados. | PostgreSQL + SQLite |
+| `pagos_venta` | Replicada | Ledger append-only de cobros (efectivo, POS, QR). | PostgreSQL + SQLite |
+| `archivos_multimedia` | Replicada | Catálogo de imágenes, hashes y rutas a Storage. | PostgreSQL + SQLite |
+| `sync_outbox` | Exclusiva SQLite | Cola local transaccional de mutaciones pendientes. | SQLite local |
+| `sync_processed_mutations` | Exclusiva PG | Tabla de deduplicación e idempotencia global. | PostgreSQL (Supabase) |
+| `auditoria_financiera` | Exclusiva PG | Registro forense append-only de eventos financieros. | PostgreSQL (Supabase) |

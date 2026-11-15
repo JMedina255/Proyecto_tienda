@@ -2,7 +2,7 @@
 
 **Proyecto:** Sistema de Gestión de Librería — Proyecto Tienda<br>
 **Documento:** PLAN_DESARROLLO.md<br>
-**Estado:** Actualizado en H02.1<br>
+**Estado:** Actualizado en H03<br>
 **Trazabilidad:** [../01-requerimientos/SRS.md](../01-requerimientos/SRS.md) | [../06-gestion/DECISIONES.md](../06-gestion/DECISIONES.md)
 
 ---
@@ -21,8 +21,8 @@ flowchart TD
     H01 --> H01_1["H01.1: Simplificación y Normalización\nDocumental (Completado)"]
     H01_1 --> H02["H02: Arquitectura del Sistema\ny Sincronización Offline (Completado)"]
     H02 --> H02_1["H02.1: Correcciones Críticas\nde Arquitectura (Completado)"]
-    H02_1 --> H03["H03: Modelo y Diccionario\nde Datos Relacional (Hito Activo)"]
-    H03 --> H04["H04: Estándares de Programación\ny Hardening de Seguridad"]
+    H02_1 --> H03["H03: Modelo y Diccionario\nde Datos Relacional (Completado)"]
+    H03 --> H04["H04: Estándares de Programación\ny Hardening de Seguridad (Hito Activo)"]
     H04 --> H05["H05: Planificación Técnica,\nPruebas y Criterios"]
     H05 --> H06["H06: Preparación del Monorepo,\nPersistencia e Infraestructura Sync (Gate)"]
     H06 -.-> H07["H07+: Desarrollo Iterativo de\nMódulos sobre Capa Sync Base"]
@@ -127,14 +127,15 @@ A partir de H00.2, cada hito completado tiene como entregable mandatorio:
 ---
 
 ### Hito H03: Modelo y Diccionario de Datos
-- **Objetivo:** Consolidar el modelo relacional definitivo y completar el diccionario de datos exhaustivo para SQLite y PostgreSQL.
+- **Objetivo:** Consolidar el modelo relacional definitivo y completar el diccionario de datos exhaustivo para SQLite y PostgreSQL, garantizando la integridad de operaciones financieras inmutables (append-only), ventas rápidas, pedidos no catalogados, conciliación de caja y sincronización multi-dispositivo con idempotencia.
 - **Dependencias:** H01.1, H02, H02.1.
 - **Entregables:**
-  - Esquema relacional definitivo en [MODELO_DATOS.md](../02-arquitectura/MODELO_DATOS.md) con todas las entidades normalizadas.
-  - Catálogo completo de tablas, columnas, tipos de datos, nulabilidad, restricciones `CHECK`, claves foráneas e índices en [DICCIONARIO_DATOS.md](../03-estandares/DICCIONARIO_DATOS.md).
-  - Estrategia de migraciones versionadas y scripts DDL preliminares.
-- **Criterios de Aceptación:** Coherencia de tipos entre SQLite y PostgreSQL para el 100% de las tablas y campos del sistema.
-- **Estado:** **Hito Activo / Próximo hito.**
+  - Esquema relacional estructurado por dominios en [MODELO_DATOS.md](../02-arquitectura/MODELO_DATOS.md) con 26 entidades y diagramas ERD Mermaid.
+  - Catálogo completo de tablas, tipos PostgreSQL/SQLite, claves primarias UUID v4, nulabilidad, restricciones `CHECK`, `UNIQUE` e índices en [DICCIONARIO_DATOS.md](../03-estandares/DICCIONARIO_DATOS.md).
+  - Matriz de integridad y restricciones financieras anti-LWW (prevención de pagos duplicados, saldos negativos y abonos excedentes).
+  - **Entregable Git:** Commit `docs(h03): modelo relacional y diccionario de datos` y push a `origin/master`.
+- **Criterios de Aceptación:** Coherencia de tipos y restricciones entre SQLite y PostgreSQL para el 100% de las tablas y campos del sistema.
+- **Estado:** **Completado.**
 
 ---
 
@@ -148,6 +149,7 @@ A partir de H00.2, cada hito completado tiene como entregable mandatorio:
   - Diseño del almacenamiento seguro de credenciales con Android Keystore / `expo-secure-store`.
   - Definición de procedimientos de auditoría de seguridad y sanitización de datos.
 - **Criterios de Aceptación:** Matriz de seguridad [HARDENING.md](../04-seguridad/HARDENING.md) con controles detallados y criterios de verificación técnica.
+- **Estado:** **Hito Activo / Próximo hito.**
 
 ---
 
