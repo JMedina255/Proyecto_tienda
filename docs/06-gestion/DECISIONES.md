@@ -30,10 +30,10 @@ Cada decisión cuenta con un identificador único, fecha de registro, estado, co
 | [DEC-009](#dec-009-arquitectura-offline-first-con-sqlite-local-y-supabase-remoto) | Arquitectura Offline-First con SQLite local y Supabase remoto | **Confirmado** | Aprobada |
 | [DEC-010](#dec-010-captura-asistida-de-libros-mediante-fotografía-y-ocr) | Captura asistida de libros mediante fotografía y OCR | **Confirmado** | Aprobada |
 | [DEC-011](#dec-011-modalidad-de-venta-rápida-con-foto-y-detalle-pendiente-de-completar) | Modalidad de venta rápida con foto y detalle pendiente de completar | **Confirmado** | Aprobada |
-| [DEC-012](#dec-012-selección-del-motor-y-estrategia-de-sincronización-offline) | Selección del motor y estrategia de sincronización offline | **Propuesto (Recomendado)** | **Imprescindible antes de H06** |
+| [DEC-012](#dec-012-selección-del-motor-y-estrategia-de-sincronización-offline) | Selección del motor y estrategia de sincronización offline | **Confirmado (Aprobado H06)** | Aprobada para H06 |
 | [DEC-013](#dec-013-selección-de-la-tecnología-de-reconocimiento-ocr) | Selección de la tecnología de reconocimiento OCR | **Propuesto (Recomendado)** | **Necesaria antes de H07** |
-| [DEC-014](#dec-014-orquestador-de-monorepo-turborepo--pnpm) | Orquestador de monorepo: Turborepo + pnpm | **Propuesto (Recomendado)** | **Imprescindible antes de H06** |
-| [DEC-015](#dec-015-estrategia-de-cifrado-de-base-de-datos-local-sqlite) | Estrategia de cifrado de base de datos local SQLite y replicación segura | **Propuesto (Recomendado)** | **Imprescindible antes de H06** |
+| [DEC-014](#dec-014-orquestador-de-monorepo-turborepo--pnpm) | Orquestador de monorepo: Turborepo + pnpm | **Confirmado (Aprobado H06)** | Aprobada para H06 |
+| [DEC-015](#dec-015-estrategia-de-cifrado-de-base-de-datos-local-sqlite) | Estrategia de cifrado de base de datos local SQLite y replicación segura | **Confirmado Alcance Base (H06)** | Aprobada base híbrida |
 | [DEC-016](#dec-016-política-de-descuentos-máximos-delegados) | Política de descuentos máximos delegados para el rol Vendedor | **Propuesto (Pendiente)** | **Necesaria antes de H08** |
 | [DEC-017](#dec-017-período-de-gracia-para-caducidad-de-sesiones-offline) | Período de gracia para caducidad de sesiones offline | **Propuesto (Pendiente)** | **Diferible (evaluar en H10)** |
 | [DEC-018](#dec-018-política-de-exclusividad-de-sesión-de-caja-por-dispositivo) | Exclusividad de sesión de caja por dispositivo físico | **Propuesto (Pendiente)** | **Necesaria antes de H08** |
@@ -138,8 +138,8 @@ Cada decisión cuenta con un identificador único, fecha de registro, estado, co
 > Las siguientes decisiones representan alternativas técnicas en evaluación. No son vinculantes ni definitivas en esta fase y deberán resolverse formalmente en los hitos correspondientes de arquitectura (H02) y hardening (H04) antes de iniciar la implementación en H06.
 
 ### DEC-012: Selección del motor y estrategia de sincronización offline
-- **Estado:** Propuesto (Recomendado en H02 - Pendiente de aprobación formal)
-- **Fecha:** 2026-11-15
+- **Estado:** Confirmado (Aprobado formalmente por el usuario en H06)
+- **Fecha:** 2026-11-15 (Aprobación: 2026-11-15)
 - **Contexto:** Se requiere replicar datos bidireccionalmente entre SQLite local (`apps/mobile`) y PostgreSQL central en Supabase, garantizando autonomía total sin red y consistencia financiera estricta.
 - **Alternativas Evaluadas:**
   1. *PowerSync (`@journeyapps/powersync-sdk-react-native`):* Replicación lógica reactiva basada en SQLite. Desventaja: requiere servicio intermediario (Docker self-hosted o cloud de pago) y no resuelve por sí solo las mutaciones ascendentes complejas.
@@ -166,8 +166,8 @@ Cada decisión cuenta con un identificador único, fecha de registro, estado, co
 - **Referencias:** [ARQUITECTURA.md](../02-arquitectura/ARQUITECTURA.md#52-pipeline-de-captura-fotográfica-y-ocr-on-device), [SRS.md](../01-requerimientos/SRS.md#módulo-3-captura-asistida-por-ocr).
 
 ### DEC-014: Orquestador de monorepo: Turborepo + pnpm
-- **Estado:** Propuesto (Recomendado en H02 - Pendiente de aprobación formal)
-- **Fecha:** 2026-11-15
+- **Estado:** Confirmado (Aprobado formalmente por el usuario en H06)
+- **Fecha:** 2026-11-15 (Aprobación: 2026-11-15)
 - **Contexto:** Se requiere estructurar el repositorio para alojar `apps/mobile`, `apps/web` y librerías compartidas (`packages/*`).
 - **Alternativas Evaluadas:**
   1. *pnpm Workspaces + Turborepo:* Enlaces duros, ahorro de disco y caché incremental determinista.
@@ -179,8 +179,9 @@ Cada decisión cuenta con un identificador único, fecha de registro, estado, co
 - **Referencias:** [ARQUITECTURA.md](../02-arquitectura/ARQUITECTURA.md#2-organización-del-monorepo).
 
 ### DEC-015: Estrategia de cifrado de base de datos local SQLite
-- **Estado:** Propuesto (Recomendado en H02 - Pendiente de aprobación formal)
-- **Fecha:** 2026-11-15
+- **Estado:** Confirmado con alcance base (Aprobado formalmente por el usuario en H06)
+- **Fecha:** 2026-11-15 (Aprobación base: 2026-11-15)
+- **Alcance Autorizado H06:** Enfoque de protección híbrida confirmado: almacenamiento privado interno en Android (`Context.getFilesDir()`), Keystore (`expo-secure-store`) para tokens y credenciales de sesión, y evaluación del cifrado por campos. La implementación criptográfica específica queda pendiente de validación técnica antes de almacenar datos bancarios en H09.
 - **Contexto:** Proteger datos comerciales y sensibles en dispositivos móviles de mostrador ante sustracción física o rooteo del dispositivo.
 - **Alternativas Evaluadas:**
   1. *SQLCipher (Cifrado completo de base de datos a nivel de página):* Ofrece cifrado homogéneo de todo el archivo SQLite. Desventajas: sobrecarga de CPU/IO de un 15-25% en operaciones frecuentes de mostrador en hardware modesto; complejidad de integración con Expo (requiere módulo nativo personalizado); fragilidad crítica: si la clave maestra en el Keystore se corrompe o se desincroniza, toda la base de datos local queda irremediablemente ilegible y corrompida.

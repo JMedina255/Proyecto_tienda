@@ -2,7 +2,7 @@
 
 **Proyecto:** Sistema de Gestión de Librería — Proyecto Tienda<br>
 **Documento:** HARDENING.md<br>
-**Estado:** Consolidado y Refinado en H04<br>
+**Estado:** Consolidado y Refinado en H06<br>
 **Trazabilidad:** [../01-requerimientos/SRS.md](../01-requerimientos/SRS.md) | [../02-arquitectura/ARQUITECTURA.md](../02-arquitectura/ARQUITECTURA.md) | [../02-arquitectura/MODELO_DATOS.md](../02-arquitectura/MODELO_DATOS.md) | [../06-gestion/DECISIONES.md](../06-gestion/DECISIONES.md) | [../../AGENTS.md](../../AGENTS.md)
 
 ---
@@ -17,7 +17,7 @@ Para garantizar máxima trazabilidad técnica y rigor de auditoría, cada contro
 - **No Aplicable:** Control evaluado pero descartado de forma justificada por encontrarse fuera del alcance del sistema o del modelo de amenazas.
 
 > [!IMPORTANT]
-> En este hito documental **H04**, todos los controles técnicos se declaran en estado **Pendiente**, dado que el repositorio se mantiene exclusivamente en fase de especificación y diseño sin despliegue de código aplicativo ni aprovisionamiento de infraestructura remota.
+> En el hito **H06**, los controles de Secreto Cero (`SEC-SECR-001`, `SEC-SECR-002`) e idempotencia (`SEC-SYNC-002`) han sido **Verificados** mediante pruebas automatizadas y escaneo; la validación con esquemas Zod (`SEC-INP-001`) y el sandbox de aplicación (`SEC-DATA-002`) han sido **Implementados** en la base del monorepo. Los demás controles técnicos se mantienen en estado **Pendiente** hasta la implementación de sus respectivos módulos funcionales.
 
 ---
 
@@ -120,17 +120,17 @@ Para garantizar máxima trazabilidad técnica y rigor de auditoría, cada contro
 | `SEC-AUTHZ-003` | Autorización en dos pasos con PIN para entregas con saldo | Otorgamiento discrecional o fraudulento de crédito (fiado) | Prueba unitaria y de flujo: bloqueo de fiado sin firma de supervisor | **Pendiente** |
 | `SEC-AUTHZ-004` | Autorización offline con caducidad, lista CRL y firma HMAC | Fraude con supervisores dados de baja en terminales desconectados | Prueba de rechazo de autorización con supervisor en lista CRL | **Pendiente** |
 | `SEC-DATA-001` | Cifrado AES-256 de campos bancarios y sensibles (DEC-015) | Acceso a números de cuenta bancaria ante sustracción o rooteo | Inspección de base de datos SQLite verificando texto cifrado | **Pendiente** |
-| `SEC-DATA-002` | Aislamiento de SQLite e imágenes en sandbox de la app | Acceso o manipulación de datos locales por otras apps instaladas | Auditoría de rutas verificando uso exclusivo de `Context.getFilesDir()` | **Pendiente** |
+| `SEC-DATA-002` | Aislamiento de SQLite e imágenes en sandbox de la app | Acceso o manipulación de datos locales por otras apps instaladas | Auditoría de rutas verificando uso exclusivo de `Context.getFilesDir()` | **Implementado** |
 | `SEC-DATA-003` | Purgado automático de archivos temporales de cámara y OCR | Fuga de imágenes transitorias o agotamiento de almacenamiento | Verificación de eliminación de archivos en carpeta `cache/` tras proceso | **Pendiente** |
 | `SEC-STRG-001` | Visibilidad estrictamente privada en buckets de Storage | Acceso público o indexación no autorizada de comprobantes y fotos | Auditoría de metadatos de buckets en Supabase Storage (`public = false`) | **Pendiente** |
 | `SEC-STRG-002` | Descarga de archivos mediante URLs firmadas de corta vigencia | Enlace perpetuo a comprobantes financieros confidenciales | Validación de cabeceras de expiración en URLs generadas (máx. 15 min) | **Pendiente** |
 | `SEC-NET-001` | Transporte cifrado mandatorio TLS 1.3 en HTTPS y WebSocket | Interceptación de credenciales y datos en tránsito | Análisis de tráfico de red y rechazo de versiones TLS inferiores | **Pendiente** |
 | `SEC-NET-002` | Certificate Pinning en compilación de producción Android | Ataques de intermediario (MitM) en redes locales comprometidas | Prueba de interceptación con proxy HTTP en compilación release | **Pendiente** |
-| `SEC-SECR-001` | Política de Secreto Cero en repositorio de código | Exposición de credenciales, tokens de servicio o contraseñas | Escáner automatizado de secretos en commits y verificación de `.env.example` | **Pendiente** |
-| `SEC-SECR-002` | Exclusión absoluta de `service_role key` en la app móvil | Compromiso total del backend si la app cliente es descompilada | Análisis estático de binario APK buscando cadenas `service_role` | **Pendiente** |
+| `SEC-SECR-001` | Política de Secreto Cero en repositorio de código | Exposición de credenciales, tokens de servicio o contraseñas | Escáner automatizado de secretos en commits y verificación de `.env.example` | **Verificado** |
+| `SEC-SECR-002` | Exclusión absoluta de `service_role key` en la app móvil | Compromiso total del backend si la app cliente es descompilada | Análisis estático de binario APK buscando cadenas `service_role` | **Verificado** |
 | `SEC-AUD-001` | Inmutabilidad de ledgers financieros (modelo append-only) | Alteración o borrado de transacciones de venta o pagos | Pruebas de ejecución de sentencias `UPDATE`/`DELETE` rechazadas por BD | **Pendiente** |
 | `SEC-AUD-002` | Bitácora forense de autorizaciones y anulaciones | Falta de trazabilidad ante discrepancias de dinero o mercadería | Comprobación de inserción en `auditoria_financiera` ante cada evento | **Pendiente** |
 | `SEC-SYNC-001` | Validación de permisos y congruencia en mutaciones outbox | Inyección de mutaciones manipuladas desde terminales comprometidos | Pruebas de envío de mutaciones falsificadas esperando rechazo 403/422 | **Pendiente** |
-| `SEC-SYNC-002` | Deduplicación e idempotencia por hash SHA-256 | Duplicación accidental de cobros o asientos por reintentos de red | Prueba de envío repetido del mismo `idempotency_key` con respuesta idempotente | **Pendiente** |
+| `SEC-SYNC-002` | Deduplicación e idempotencia por hash SHA-256 | Duplicación accidental de cobros o asientos por reintentos de red | Prueba de envío repetido del mismo `idempotency_key` con respuesta idempotente | **Verificado** |
 | `SEC-SYNC-003` | Seguridad estricta en RPCs (`search_path`, roles, no PUBLIC) | Inyección SQL o escalación de privilegios en funciones Postgres | Auditoría de DDL de funciones RPC y revocación de permisos a `PUBLIC` | **Pendiente** |
-| `SEC-INP-001` | Validación estricta con esquemas Zod en todas las entradas | Inyección SQL, datos malformados o inconsistencia de tipos | Pruebas unitarias de validación con inputs maliciosos o truncados | **Pendiente** |
+| `SEC-INP-001` | Validación estricta con esquemas Zod en todas las entradas | Inyección SQL, datos malformados o inconsistencia de tipos | Pruebas unitarias de validación con inputs maliciosos o truncados | **Implementado** |

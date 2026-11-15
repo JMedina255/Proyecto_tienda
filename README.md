@@ -164,10 +164,10 @@ Toda la documentación técnica y de gestión del proyecto reside en el director
 
 | Parámetro | Estado |
 | :--- | :--- |
-| **Fase actual** | Fase 1 — Especificación Funcional y Diseño de Arquitectura |
-| **Hito completado recientemente** | **H05 — Planificación técnica y estrategia de pruebas** |
-| **Hitos cerrados** | **H00** (Inicialización), **H00.1** (Auditoría), **H00.2** (Git y versionado), **H01** (SRS y reglas), **H01.1** (Simplificación y normalización), **H02** (Arquitectura), **H02.1** (Correcciones críticas), **H03** (Modelo y diccionario), **H04** (Estándares y hardening), **H05** (Planificación y pruebas) |
+| **Fase actual** | Fase 2 — Construcción Incremental |
+| **Hito completado recientemente** | **H06 — Inicialización del monorepo y base Offline-First** |
+| **Hitos cerrados** | **H00** (Inicialización), **H00.1** (Auditoría), **H00.2** (Git y versionado), **H01** (SRS y reglas), **H01.1** (Simplificación y normalización), **H02** (Arquitectura), **H02.1** (Correcciones críticas), **H03** (Modelo y diccionario), **H04** (Estándares y hardening), **H05** (Planificación y pruebas), **H06** (Monorepo y base offline) |
 | **Repositorio remoto** | [https://github.com/JMedina255/Proyecto_tienda.git](https://github.com/JMedina255/Proyecto_tienda) (rama `master`) |
-| **Código fuente** | Aún no iniciado (Sujeto a aprobación formal de decisiones para H06) |
-| **Servicios externos** | Sin provisionar (Pendiente de configuración en hitos posteriores) |
-| **Próximo hito** | **H06:** Preparación del monorepo, persistencia e infraestructura sync base (Gate técnico) |
+| **Código fuente** | Inicializado monorepo con Turborepo + pnpm workspaces, 4 paquetes modulares y app móvil Expo Android (34 pruebas automatizadas aprobadas) |
+| **Servicios externos** | Cliente Supabase tipado y simulado localmente (Backend cloud real pendiente de aprovisionamiento) |
+| **Próximo hito** | **H07:** Catálogo bibliográfico, categorías, ediciones y captura asistida por OCR on-device |

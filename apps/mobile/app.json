@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "Proyecto Tienda - Gestión de Librería",
+    "slug": "proyecto-tienda-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "android": {
+      "package": "com.proyectotienda.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#ffffff"
+      }
+    },
+    "plugins": []
+  }
+}

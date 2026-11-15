@@ -2,7 +2,7 @@
 
 **Proyecto:** Sistema de Gestión de Librería — Proyecto Tienda<br>
 **Documento:** PLAN_DESARROLLO.md<br>
-**Estado:** Consolidado y Refinado en H05<br>
+**Estado:** Consolidado y Actualizado en H06<br>
 **Trazabilidad:** [../01-requerimientos/SRS.md](../01-requerimientos/SRS.md) | [../01-requerimientos/REGLAS_NEGOCIO.md](../01-requerimientos/REGLAS_NEGOCIO.md) | [../02-arquitectura/ARQUITECTURA.md](../02-arquitectura/ARQUITECTURA.md) | [../03-estandares/ESTANDAR_PROGRAMACION.md](../03-estandares/ESTANDAR_PROGRAMACION.md) | [../04-seguridad/HARDENING.md](../04-seguridad/HARDENING.md) | [../06-gestion/DECISIONES.md](../06-gestion/DECISIONES.md)
 
 ---
@@ -28,9 +28,9 @@ flowchart TD
         H04 --> H05["H05: Plan Técnico y Estrategia de Pruebas"]
     end
 
-    subgraph Fase_Construccion["Fase 2: Construcción Incremental (Planificada)"]
-        H05 ==> H06["H06: Monorepo, SQLite y Sync Base (Quality Gate)"]
-        H06 --> H07["H07: Catálogo, Ediciones y OCR On-Device"]
+    subgraph Fase_Construccion["Fase 2: Construcción Incremental"]
+        H05 ==> H06["H06: Monorepo, SQLite y Sync Base (Completado)"]
+        H06 ==> H07["H07: Catálogo, Ediciones y OCR On-Device (Próximo)"]
         H07 --> H08["H08: Caja, Ventas, Pagos Mixtos y Fiados"]
         H08 --> H09["H09: Proveedores, Pedidos, Recepciones y Gastos"]
         H09 --> H10["H10: Pruebas Integrales Offline y Conciliación"]
@@ -53,13 +53,14 @@ flowchart TD
 - **H02 / H02.1:** Arquitectura técnica, durabilidad WAL `FULL` y seguridad RPC ([Commit `61fa4e3`](https://github.com/JMedina255/Proyecto_tienda/commit/61fa4e3)).
 - **H03:** Modelo relacional de 26 entidades y diccionario relacional exhaustivo ([Commit `7326e39`](https://github.com/JMedina255/Proyecto_tienda/commit/7326e39)).
 - **H04:** Estándares de TypeScript, Zod, Result pattern y matriz de seguridad de 21 controles ([Commit `a9d01f0`](https://github.com/JMedina255/Proyecto_tienda/commit/a9d01f0)).
-- **H05 (Hito Actual):** Plan de implementación incremental, estrategia de pruebas, criterios de aceptación (*Quality Gates*) y clasificación de decisiones pendientes. **Completado.**
+- **H05:** Plan de implementación incremental, estrategia de pruebas, criterios de aceptación (*Quality Gates*) y clasificación de decisiones pendientes ([Commit `a4c73dc`](https://github.com/JMedina255/Proyecto_tienda/commit/a4c73dc)).
+- **H06 (Hito Completado):** Monorepo con Turborepo y pnpm workspaces, paquetes modulares (`shared-types`, `business-logic`, `database`, `sync-engine`), persistencia SQLite WAL `FULL`, cola Outbox, motor de sincronización con backoff e idempotencia SHA-256, app móvil Expo Android y 34 pruebas automatizadas aprobadas. **Completado.**
 
 ---
 
 ### 2.2 Plan de Fases de Construcción Incremental (H06 a H11)
 
-#### Hito H06: Monorepo, Persistencia Local e Infraestructura Sync Base (Gate Técnico)
+#### Hito H06: Monorepo, Persistencia Local e Infraestructura Sync Base (Gate Técnico — Completado)
 - **Objetivo:** Inicializar el monorepo y construir la infraestructura fundacional de persistencia local y sincronización como paso previo indispensable antes de abordar ventas o tesorería.
 - **Dependencias:** Aprobación formal de H05 y resolución de decisiones bloqueantes (`DEC-012`, `DEC-014`, `DEC-015`).
 - **Entregables:**

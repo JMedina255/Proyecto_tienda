@@ -6,6 +6,49 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [0.1.0] - 2026-11-15 (Hito H06 — Inicialización del Monorepo y Base Offline-First)
+
+### Añadido
+- **Arquitectura de Monorepo con Turborepo y pnpm Workspaces (`DEC-014`):**
+  - Configuración de raíz con `pnpm-workspace.yaml`, `.npmrc` (hoisted), `turbo.json` (pipelines `build`, `typecheck`, `test`), `tsconfig.base.json` (TypeScript 5.8 estricto).
+  - Paquetes modulares creados: `packages/shared-types`, `packages/business-logic`, `packages/database`, `packages/sync-engine`, y aplicación móvil `apps/mobile`.
+- **Tipos y Contratos Compartidos (`packages/shared-types`):**
+  - Entidades de dominio base (`RolUsuario`, `EstadoVenta`, `EstadoPago`, `EstadoEntrega`, `EstadoCaja`, `MedioPago`, `TipoVenta`, `Usuario`).
+  - Contratos de sincronización (`SyncOperation`, `SyncStatus`, `SyncMutation`, `SyncBatchRequest`, `SyncBatchResponse`).
+  - Contratos tipados de RPCs de Supabase (`sync_push_mutations`, `conciliar_caja_offline`).
+- **Lógica de Negocio y Utilidades Monetarias (`packages/business-logic`):**
+  - Tipo `Centavos` con parseo determinista mediante expresiones regulares (`parseSolesToCentavos`) evitando errores de punto flotante binario IEEE 754.
+  - Formateo monetario (`toDecimalString`, `formatMoneda`), aritmética protegida (`sumCentavos`, `subtractCentavos`) y límite `MAX_SAFE_CENTAVOS`.
+  - Manejo funcional de errores con patrón `Result<T, E>` (`ok`, `err`).
+  - Esquemas de validación en tiempo de ejecución con Zod (`SEC-INP-001`).
+- **Capa de Persistencia SQLite y Cola Outbox (`packages/database`):**
+  - Driver abstracto `SqliteDriver` y configuración de pragmas de conexión (`foreign_keys = ON;`, `journal_mode = WAL;`, `synchronous = FULL;`).
+  - Sistema de migraciones DDL con migración inicial `001_initial_sync_schema` (tabla `sync_outbox`, índices, tabla `sync_metadata`).
+  - Repositorio `OutboxRepository` para encolar mutaciones, consultar pendientes, marcar en proceso, sincronizados o fallidos con backoff.
+  - Driver de pruebas `BetterSqliteDriver` sobre `better-sqlite3` para pruebas de integración con SQLite real en memoria/archivo sin necesidad de emulador.
+- **Motor de Sincronización e Idempotencia (`packages/sync-engine`):**
+  - Algoritmo de hash SHA-256 compuesto determinista para `idempotency_key` (`SEC-SYNC-002`).
+  - Cálculo de retroceso exponencial (*exponential backoff*) con fluctuación aleatoria (*jitter*) para reintentos de red.
+  - Cliente RPC de Supabase tipado (`SupabaseSyncClient`) y simulador para pruebas con fallos transitorios e interrupciones.
+  - Despachador de sincronización `SyncDispatcher` con procesamiento por lotes, control de concurrencia y actualización de estados.
+- **Aplicación Móvil Android en Expo (`apps/mobile`):**
+  - Configuración de Expo SDK 52 con React Native 0.76.7 y TypeScript.
+  - Configuración de Metro para resolución de paquetes en monorepo.
+  - Pantalla base `App.tsx` con verificación en vivo de estado de infraestructura técnica, cálculo monetario y generación de clave de idempotencia.
+- **Suite de Pruebas Automatizadas:**
+  - 34 pruebas automatizadas aprobadas (14 en `business-logic`, 11 en `database`, 9 en `sync-engine`).
+
+### Cambiado
+- **Aprobación de Decisiones Técnicas (`docs/06-gestion/DECISIONES.md`):**
+  - `DEC-012` (Outbox + Supabase RPC), `DEC-014` (Monorepo pnpm + Turborepo) y `DEC-015` (Protección híbrida base) formalmente aprobadas para el hito H06.
+- **Matriz de Seguridad (`docs/04-seguridad/HARDENING.md`):**
+  - Actualizados `SEC-SECR-001`, `SEC-SECR-002` y `SEC-SYNC-002` a `Verificado`.
+  - Actualizados `SEC-DATA-002` y `SEC-INP-001` a `Implementado`.
+- **Actualización de Planificación (`docs/05-planificacion/PLAN_DESARROLLO.md`, `docs/README.md`, `README.md`):**
+  - H06 marcado como completado y H07 posicionado como próximo hito de construcción.
+
+---
+
 ## [0.0.10] - 2026-11-15 (Hito H05 — Planificación Técnica y Estrategia de Pruebas)
 
 ### Añadido
