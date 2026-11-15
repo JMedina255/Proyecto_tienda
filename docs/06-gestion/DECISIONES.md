@@ -34,7 +34,7 @@ Cada decisión cuenta con un identificador único, fecha de registro, estado, co
 | [DEC-013](#dec-013-selección-de-la-tecnología-de-reconocimiento-ocr) | Selección de la tecnología de reconocimiento OCR | **Pendiente de decisión** | 2026-11-15 |
 | [DEC-014](#dec-014-orquestador-de-monorepo-turborepo--pnpm) | Orquestador de monorepo: Turborepo + pnpm | **Propuesto** | 2026-11-15 |
 | [DEC-015](#dec-015-estrategia-de-cifrado-de-base-de-datos-local-sqlite) | Estrategia de cifrado de base de datos local SQLite | **Pendiente de decisión** | 2026-11-15 |
-| [DEC-016](#dec-016-política-de-descuentos-máximos-delegados) | Política de descuentos máximos delegados para el rol Vendedor | **Propuesto** | 2026-11-15 |
+| [DEC-016](#dec-016-política-de-descuentos-máximos-delegados) | Política de descuentos máximos delegados para el rol Vendedor | **Propuesto (Pendiente de decisión)** | 2026-11-15 |
 
 ---
 
@@ -173,9 +173,9 @@ Cada decisión cuenta con un identificador único, fecha de registro, estado, co
 - **Criterio de decisión:** Impacto en el rendimiento de consultas locales, compatibilidad con Expo Config Plugins y complejidad de recuperación de llaves.
 
 ### DEC-016: Política de descuentos máximos delegados
-- **Estado:** Propuesto (Hito de resolución: **H01 / Aprobación de Dueño**)
+- **Estado:** Propuesto (Pendiente de decisión del Dueño / Interesados)
 - **Fecha:** 2026-11-15
-- **Contexto:** Se requiere proteger los márgenes comerciales de la librería sin entorpecer la agilidad del regateo o promociones de mostrador.
-- **Propuesta:** Permitir al rol `Vendedor` aplicar hasta un 15% de descuento sobre el precio referencial de forma autónoma. Descuentos superiores o modificaciones drásticas de precio exigirán PIN o confirmación de credenciales del `Dueño` o `Administrador` (ref: `RN-VTA-004`).
-- **Alternativa:** Mantener libertad total de edición de precios para el vendedor sin umbrales técnicos y controlar mediante auditoría posterior.
-- **Criterio de decisión:** Grado de autonomía requerido vs. riesgo de descalce de ingresos en mostrador.
+- **Contexto:** Se requiere proteger los márgenes comerciales de la librería sin entorpecer la agilidad del regateo o promociones de mostrador. En H01.1 se identificó que el umbral del 15% no ha sido confirmado formalmente por el usuario.
+- **Propuesta:** Permitir al rol `Vendedor` aplicar hasta un 15% de descuento sobre el precio referencial de forma autónoma. Descuentos superiores o modificaciones drásticas de precio exigirían confirmación o PIN del `Dueño` o `Administrador` (ref: propuesta `RN-VTA-004`).
+- **Alternativa:** Mantener libertad total de edición de precios para el vendedor sin umbrales técnicos rígidos y auditar a posteriori mediante reportes comparativos de precio de venta vs. precio referencial.
+- **Criterio de decisión:** No se impondrá como regla obligatoria en el MVP hasta que el Dueño decida formalmente si prefiere control previo (límite porcentual) o control posterior (auditoría).

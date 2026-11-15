@@ -1,8 +1,8 @@
 # Plan de Desarrollo del Proyecto (PLAN_DESARROLLO.md)
 
-**Proyecto:** Sistema de Gestión de Librería — Proyecto Tienda  
-**Documento:** PLAN_DESARROLLO.md  
-**Estado:** Actualizado y Realineado en H00.1  
+**Proyecto:** Sistema de Gestión de Librería — Proyecto Tienda<br>
+**Documento:** PLAN_DESARROLLO.md<br>
+**Estado:** Actualizado en H01.1<br>
 **Trazabilidad:** [../01-requerimientos/SRS.md](../01-requerimientos/SRS.md) | [../06-gestion/DECISIONES.md](../06-gestion/DECISIONES.md)
 
 ---
@@ -18,7 +18,8 @@ flowchart TD
     H00["H00: Inicialización Documental\n(Completado)"] --> H00_1["H00.1: Auditoría y Correcciones\n(Completado)"]
     H00_1 --> H00_2["H00.2: Configuración Git y Política\n(Completado)"]
     H00_2 --> H01["H01: Especificación Detallada SRS\ny Reglas de Negocio (Completado)"]
-    H01 --> H02["H02: Arquitectura del Sistema\ny Sincronización Offline (Hito Activo)"]
+    H01 --> H01_1["H01.1: Simplificación y Normalización\nDocumental (Completado)"]
+    H01_1 --> H02["H02: Arquitectura del Sistema\ny Sincronización Offline (Hito Activo)"]
     H02 --> H03["H03: Modelo y Diccionario\nde Datos Relacional"]
     H03 --> H04["H04: Estándares de Programación\ny Hardening de Seguridad"]
     H04 --> H05["H05: Planificación Técnica,\nPruebas y Criterios"]
@@ -82,9 +83,24 @@ A partir de H00.2, cada hito completado tiene como entregable mandatorio:
 
 ---
 
+### Hito H01.1: Simplificación y Normalización Documental
+- **Objetivo:** Eliminar redundancias, simplificar y estructurar densamente `SRS.md` y `REGLAS_NEGOCIO.md` mediante tablas compactas, normalizar las inconsistencias numéricas de H01 (declarar y enumerar exactamente 27 reglas de negocio y 14 casos de uso), mantener políticas no confirmadas (umbral de 15% de descuento en `RN-VTA-004` / `DEC-016`) estrictamente como propuestas pendientes, establecer el estándar documental permanente y actualizar `AGENTS.md`.
+- **Dependencias:** H01.
+- **Entregables:**
+  - `docs/03-estandares/ESTANDAR_DOCUMENTACION.md` con reglas de brevedad, alta densidad, tablas compactas y estabilidad de IDs.
+  - Actualización de `AGENTS.md` (Sección 10) mandatoria para todos los agentes en hitos presentes y futuros.
+  - `SRS.md` condensado y estructurado con 45 RFs en tablas modulares, 14 CUs completos y matriz de trazabilidad 1 a 1.
+  - `REGLAS_NEGOCIO.md` condensado con catálogo de 27 reglas (26 confirmadas + 1 propuesta pendiente), matrices de compatibilidad y RBAC.
+  - `DECISIONES.md` con `DEC-016` documentado unívocamente como propuesta pendiente.
+  - **Entregable Git:** Commit `docs(h01.1): simplificacion y normalizacion documental` y push a `origin/master`.
+- **Criterios de Aceptación:** Documentación ágil, sin redundancias ni prosa decorativa, trazabilidad 100% íntegra y verificada.
+- **Estado:** **Completado.**
+
+---
+
 ### Hito H02: Arquitectura del Sistema y Sincronización Offline
 - **Objetivo:** Detallar el diseño de arquitectura técnica, resolver las decisiones técnicas pendientes de sincronización y OCR, y especificar el motor de replicación asíncrono.
-- **Dependencias:** H01.
+- **Dependencias:** H01.1.
 - **Entregables:**
   - Resolución formal de `DEC-012` (motor de sincronización: PowerSync vs. WatermelonDB vs. Outbox propietario).
   - Resolución formal de `DEC-013` (tecnología OCR: Google ML Kit on-device vs. cloud).
@@ -94,19 +110,6 @@ A partir de H00.2, cada hito completado tiene como entregable mandatorio:
   - **Entregable Git:** Commit `docs(h02): arquitectura y estrategia offline` y push a `origin/master`.
 - **Criterios de Aceptación:** Arquitectura offline-first completamente validada con pruebas de concepto documentadas.
 - **Estado:** **Hito Activo / Próximo hito.**
-
----
-
-### Hito H02: Arquitectura del Sistema y Sincronización Offline
-- **Objetivo:** Detallar el diseño de arquitectura técnica, resolver las decisiones técnicas pendientes de sincronización y OCR, y especificar el motor de replicación asíncrono.
-- **Dependencias:** H01.
-- **Entregables:**
-  - Resolución formal de `DEC-012` (motor de sincronización: PowerSync vs. WatermelonDB vs. Outbox propietario).
-  - Resolución formal de `DEC-013` (tecnología OCR: Google ML Kit on-device vs. cloud).
-  - Resolución formal de `DEC-014` (orquestador monorepo Turborepo + pnpm).
-  - Especificación de protocolos de sincronización, colas Outbox, estructura de payloads JSON y algoritmos deterministas de reconciliación.
-  - Diagramas de secuencia detallados de recuperación de conexión y sincronización bidireccional.
-- **Criterios de Aceptación:** Arquitectura offline-first completamente validada con pruebas de concepto documentadas.
 
 ---
 

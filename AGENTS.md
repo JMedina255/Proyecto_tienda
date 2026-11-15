@@ -110,3 +110,16 @@ A partir del hito H00.2, todo trabajo técnico o documental se rige por las sigu
 7. **Verificación Post-Push:** No se declarará completado ni publicado un hito sin comprobar explícitamente el estado del repositorio remoto y la respuesta afirmativa de GitHub.
 8. **Evolución Atómica Código-Documentación:** Toda modificación en el código que impacte entidades, flujos comerciales, arquitectura o seguridad debe comitearse junto con la actualización de la documentación correspondiente.
 9. **Estrategia de Ramas para Cambios Mayores:** Para funcionalidades complejas en fases posteriores a H06, se valorará el uso de ramas de trabajo (*feature branches*) y Pull Requests antes de su integración a la rama principal `master`.
+
+---
+
+## 10. Aplicación Obligatoria del Estándar de Documentación
+
+A partir del hito H01.1, todos los agentes y desarrolladores deben aplicar obligatoriamente el estándar definido en [`docs/03-estandares/ESTANDAR_DOCUMENTACION.md`](docs/03-estandares/ESTANDAR_DOCUMENTACION.md):
+
+1. **Concisión y Claridad:** Eliminar introducciones extensas, explicaciones duplicadas y prosa ornamental.
+2. **Tablas Compactas:** Utilizar tablas estructuradas para requisitos, reglas de negocio y matrices de trazabilidad.
+3. **Casos de Uso Enfocados:** Mantener flujos principales, alternativas y excepciones sin duplicar la redacción de requisitos.
+4. **Consistencia Numérica Absoluta:** La cantidad de reglas, casos de uso y requisitos declarados en encabezados, índices o informes debe coincidir de forma exacta con los elementos desarrollados en el cuerpo del documento.
+5. **Políticas No Confirmadas:** Tratar políticas no confirmadas (ej. límites de descuento) como **propuestas pendientes**, sin asumirlas como restricciones obligatorias hasta su aprobación expresa.
+6. **Completitud:** Favorecer documentos concisos sin imponer límites arbitrarios de líneas que fuercen la omisión de criterios de aceptación o excepciones necesarias.

@@ -145,6 +145,7 @@ Toda la documentación técnica y de gestión del proyecto reside en el director
   - [docs/02-arquitectura/ARQUITECTURA.md](docs/02-arquitectura/ARQUITECTURA.md): Diseño de componentes, monorepo y estrategia *offline-first*.
   - [docs/02-arquitectura/MODELO_DATOS.md](docs/02-arquitectura/MODELO_DATOS.md): Esquema entidad-relación preliminar y convenciones relacionales.
 - **Estándares y Diccionario:**
+  - [docs/03-estandares/ESTANDAR_DOCUMENTACION.md](docs/03-estandares/ESTANDAR_DOCUMENTACION.md): Estándar permanente de documentación concisa, verificable y trazable.
   - [docs/03-estandares/ESTANDAR_PROGRAMACION.md](docs/03-estandares/ESTANDAR_PROGRAMACION.md): Convenciones de TypeScript, React Native, testing y estilo.
   - [docs/03-estandares/DICCIONARIO_DATOS.md](docs/03-estandares/DICCIONARIO_DATOS.md): Estructura formal de campos, tipos, claves y restricciones.
 - **Seguridad:**
@@ -164,8 +165,8 @@ Toda la documentación técnica y de gestión del proyecto reside en el director
 | Parámetro | Estado |
 | :--- | :--- |
 | **Fase actual** | Fase 1 — Especificación Funcional y Diseño de Arquitectura |
-| **Hito completado recientemente** | **H01 — Especificación detallada del SRS y reglas de negocio** |
-| **Hitos cerrados** | **H00** (Inicialización), **H00.1** (Auditoría), **H00.2** (Git y versionado), **H01** (SRS y reglas) |
+| **Hito completado recientemente** | **H01.1 — Simplificación y normalización documental** |
+| **Hitos cerrados** | **H00** (Inicialización), **H00.1** (Auditoría), **H00.2** (Git y versionado), **H01** (SRS y reglas), **H01.1** (Simplificación y normalización) |
 | **Repositorio remoto** | [https://github.com/JMedina255/Proyecto_tienda.git](https://github.com/JMedina255/Proyecto_tienda) (rama `master`) |
 | **Código fuente** | Aún no iniciado (Sujeto a aprobación formal al concluir H05) |
 | **Servicios externos** | Sin provisionar (Pendiente de configuración en hitos posteriores) |

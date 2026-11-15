@@ -6,6 +6,29 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [0.0.5] - 2026-11-15 (Hito H01.1 — Simplificación y Normalización Documental)
+
+### Añadido
+- **Estándar Permanente de Documentación (`docs/03-estandares/ESTANDAR_DOCUMENTACION.md`):**
+  - Directrices obligatorias de brevedad, alta densidad informativa, tablas compactas, eliminación de narrativa ornamental, unicidad de fuente de verdad y estabilidad de identificadores.
+- **Mandato en Directrices para Agentes (`AGENTS.md`):**
+  - Incorporación de la Sección 10 que establece la obligatoriedad del cumplimiento de `ESTANDAR_DOCUMENTACION.md` para todos los agentes y desarrolladores en futuros hitos.
+
+### Cambiado
+- **Normalización y Síntesis del SRS (`docs/01-requerimientos/SRS.md`):**
+  - Reducción de ~1,022 a ~442 líneas conservando el 100% del alcance funcional, 45 RFs en tablas modulares compactas, 14 CUs estructurados con flujos y criterios de aceptación, 4 diagramas Mermaid clave y matriz de trazabilidad completa.
+- **Normalización y Síntesis de Reglas de Negocio (`docs/01-requerimientos/REGLAS_NEGOCIO.md`):**
+  - Reducción de ~338 a ~135 líneas mediante catálogo tabular compacto, matrices de compatibilidad de estados y matriz RBAC por roles.
+- **Subsanación de Inconsistencias Numéricas de H01:**
+  - Reglas de negocio: Declaración unívoca y enumeración exacta de 27 reglas (26 confirmadas + 1 propuesta pendiente: `RN-VTA-004`).
+  - Casos de uso: Declaración, desarrollo formal y trazabilidad 1 a 1 de exactamente 14 casos de uso (`CU-AUT-01`, `CU-CAT-01..02`, `CU-VTA-01..02`, `CU-PAG-01..02`, `CU-CAJ-01..03`, `CU-PED-01..02`, `CU-PRV-01`, `CU-GAS-01`).
+- **Tratamiento de Políticas No Confirmadas:**
+  - El umbral de descuento del 15% para el rol Vendedor se clasifica y documenta explícitamente como propuesta pendiente en `RN-VTA-004` y `DEC-016`, sin imponerse como regla obligatoria en el MVP.
+- **Actualización de Gobernanza y Planificación:**
+  - Actualización de `PLAN_DESARROLLO.md` (inclusión de H01.1, eliminación de bloque duplicado de H02), `docs/README.md` y `README.md`.
+
+---
+
 ## [0.0.4] - 2026-11-15 (Hito H01 — Especificación Detallada del SRS y Reglas de Negocio)
 
 ### Añadido
