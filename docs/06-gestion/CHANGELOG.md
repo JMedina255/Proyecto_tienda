@@ -6,6 +6,39 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [0.0.9] - 2026-11-15 (Hito H04 — Estándares de Programación y Hardening de Seguridad)
+
+### Añadido
+- **Estándar Exhaustivo de Programación (`docs/03-estandares/ESTANDAR_PROGRAMACION.md`):**
+  - Reglas estrictas de TypeScript (`strict`, `noImplicitAny`, prohibición de `any`, tagged unions discriminadas y tipado explícito de retornos).
+  - Modelo formal de cantidades monetarias en memoria y código operado como enteros en céntimos (`Centavos`) con funciones de conversión puras para evitar errores de redondeo de punto flotante binario IEEE 754.
+  - Arquitectura modular orientada a características (*Vertical Slices / Feature-Based*) en el monorepo (`features/[nombre]/{components, hooks, services, repositories, schemas, types}`).
+  - Convenciones para React Native y Expo: separación estricta de presentación y dominio, virtualización con `@shopify/flash-list`, y ergonomía táctil accesible (mínimo 48x48 dp).
+  - Persistencia segura y patrón repositorio: consultas parametrizadas en SQLite (`expo-sqlite`), transacciones atómicas explícitas con `withTransactionAsync` o `BEGIN IMMEDIATE`, y cliente Supabase fuertemente tipado con exclusión absoluta de `service_role_key`.
+  - Validación en fronteras mediante esquemas Zod y patrón funcional `Result<T, E>` para manejo predecible de errores de negocio.
+  - Pirámide de pruebas automatizadas: unitarias con Vitest (mínimo 85% en dominio financiero), integración con React Native Testing Library + SQLite en memoria, y E2E con Maestro en Android.
+- **Línea Base de Hardening y Matriz de Seguridad (`docs/04-seguridad/HARDENING.md`):**
+  - Reformateo estricto de la matriz de controles de seguridad en formato `ID | Control | Riesgo | Verificación | Estado`, declarando 21 controles formalmente especificados en estado `Pendiente`.
+  - Especificación exhaustiva en 9 dominios: GoTrue JWT, Android Keystore, RLS en PostgreSQL, RBAC, PIN de autorización para fiados, autorización offline con CRL y HMAC, cifrado por campos con AES-256-GCM, sandboxing, buckets privados, URLs firmadas, TLS 1.3, Secreto Cero, auditoría inmutable, idempotencia outbox y validación Zod.
+- **Análisis de Claves y Cifrado en `DEC-015` (`docs/06-gestion/DECISIONES.md`):**
+  - Comparación detallada entre SQLCipher y Cifrado Híbrido por Campos (AES-256-GCM + Android Keystore), analizando ciclo de vida de claves: generación por hardware, rotación periódica/por cambio de PIN, y mitigación de riesgo de corrupción total mediante recuperación por sincronización remota desde Supabase.
+
+### Corregido
+- **Ajustes de Modelo Relacional y Diccionario de Datos (`MODELO_DATOS.md` y `DICCIONARIO_DATOS.md`):**
+  - Sustitución de `NUMERIC` en SQLite por `INTEGER` en céntimos para el 100% de los campos monetarios, definiendo fórmula de conversión exacta con PostgreSQL `NUMERIC(12,2)`.
+  - Incorporación de campos `whatsapp` y `especialidades` en la tabla `proveedores`.
+  - Incorporación de restricción `CHECK` de identificación mínima obligatoria (nombre >= 3 chars, documento >= 6 chars) para clientes en ventas con entrega y saldo fiado.
+  - Solución al correlativo multi-terminal offline mediante asignación de series por dispositivo (`serie`, ej. `'NV01'`, `'NV02'`) con correlativo monotónico local y restricción `UNIQUE(serie, correlativo)`.
+  - Protección transaccional contra sobrepagos concurrentes mediante bloqueo `FOR UPDATE` en Supabase y `BEGIN IMMEDIATE` en SQLite.
+  - Corrección de enlaces absolutos locales `file:///` en `DICCIONARIO_DATOS.md` hacia enlaces relativos válidos en Markdown.
+
+### Cambiado
+- **Actualización de Planificación y Estado:**
+  - `docs/05-planificacion/PLAN_DESARROLLO.md`: Registro de H04 como completado y activación formal de H05 (Planificación Técnica, Pruebas y Criterios de Aceptación).
+  - `docs/README.md` y `README.md`: Sincronización del estado de avance hacia la versión `0.0.9`.
+
+---
+
 ## [0.0.8] - 2026-11-15 (Hito H03 — Diseño del Modelo y Diccionario de Datos)
 
 ### Añadido

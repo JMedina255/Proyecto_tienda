@@ -2,7 +2,7 @@
 
 **Proyecto:** Sistema de Gestión de Librería — Proyecto Tienda<br>
 **Documento:** MODELO_DATOS.md<br>
-**Estado:** Consolidado y Refinado en H03<br>
+**Estado:** Consolidado y Refinado en H04<br>
 **Trazabilidad:** [../01-requerimientos/SRS.md](../01-requerimientos/SRS.md) | [../01-requerimientos/REGLAS_NEGOCIO.md](../01-requerimientos/REGLAS_NEGOCIO.md) | [ARQUITECTURA.md](ARQUITECTURA.md) | [../03-estandares/DICCIONARIO_DATOS.md](../03-estandares/DICCIONARIO_DATOS.md)
 
 ---
@@ -16,6 +16,9 @@
 5. **Eliminación Lógica (*Soft Deletes*):** Tablas de catálogo, proveedores y maestros incorporan `deleted_at (TIMESTAMPTZ NULL)`. Las bajas lógicas se propagan como mutaciones de actualización, preservando la integridad referencial histórica.
 6. **Desacoplamiento Bibliográfico:** Separación estricta entre la obra intelectual (`libros`), sus variantes físicas y de conservación (`ediciones_libro`) y la clasificación temática (`categorias`, `libro_categoria`) ([DEC-004](../06-gestion/DECISIONES.md#dec-004-desacoplamiento-de-título-respecto-a-ediciones-y-estados-de-conservación)).
 7. **Durabilidad SQLite Diferenciada:** Cumpliendo la directriz de H02.1, SQLite aplica `PRAGMA synchronous = FULL` en transacciones financieras críticas para asegurar persistencia física (*fsync*) en disco, y `NORMAL` en consultas de catálogo.
+8. **Representación Monetaria Entera en SQLite y Conversión a PostgreSQL:** En SQLite local, todos los importes monetarios se almacenan como `INTEGER` en céntimos (eliminando imprecisiones por coma flotante binaria IEEE 754). En PostgreSQL (Supabase), se almacenan canónicamente como `NUMERIC(12,2)`. La conversión bidireccional se define de forma estricta:
+   $$\text{PostgreSQL} = \frac{\text{céntimos}}{100.00}, \quad \text{SQLite} = \operatorname{CAST}(\operatorname{ROUND}(\text{PostgreSQL} \times 100) \text{ AS INTEGER})$$
+   Garantizando consistencia aritmética exacta en cálculos de totales, saldos derivados y arqueos de caja.
 
 ---
 
@@ -76,7 +79,9 @@ erDiagram
         string nombre
         string contacto
         string telefono
+        string whatsapp
         string email
+        string especialidades
         boolean activo
         timestamp deleted_at
     }
@@ -229,6 +234,8 @@ erDiagram
         string tipo_venta
         string serie
         int correlativo
+        string cliente_nombre "nullable (obligatorio si fiado)"
+        string cliente_documento "nullable (obligatorio si fiado)"
         decimal total_bruto
         decimal total_descuentos
         decimal total_neto
@@ -353,6 +360,28 @@ erDiagram
 ### 3.6 Eliminación Lógica y Auditoría
 - Se prohíbe el borrado físico (`DELETE`) en catálogo y proveedores. La columna `deleted_at` almacena la marca UTC de baja lógica.
 - Las consultas activas filtran `WHERE deleted_at IS NULL`. La sincronización transmite la mutación `UPDATE ... SET deleted_at = ...` garantizando coherencia en todos los clientes.
+
+### 3.7 Correlativos de Notas Internas en Multi-terminal Offline (`serie-correlativo`)
+- Para evitar colisiones en numeración y cuellos de botella de red, cada terminal Android tiene asignada una serie unívoca (e.g. `'NV01'`, `'NV02'`).
+- El correlativo es un entero estrictamente monotónico generado de forma autónoma en cada SQLite local (`1, 2, 3...`).
+- En PostgreSQL se aplica la restricción compuesta `UNIQUE(serie, correlativo)`. El `UUID v4` se mantiene como clave primaria universal e inmutable.
+
+### 3.8 Validación Transaccional de Saldos Derivados y Prevención de Sobrepagos Concurrentes (`RN-VTA-003`, `RN-PAG-002`)
+- **En SQLite local:** Todo registro de pago se ejecuta dentro de una transacción atómica exclusiva (`BEGIN IMMEDIATE`). El servicio de dominio verifica que $\text{total\_pagado} + \text{nuevo\_abono} \le \text{total\_neto}$; si el abono supera la deuda, la transacción se revierte con error explícito de sobrepago.
+- **En PostgreSQL (Supabase RPC):** Se mitigan condiciones de carrera concurrentes mediante bloqueo pesimista `SELECT ... FOR UPDATE` sobre la cabecera `ventas`, recalculando atómicamente $\text{saldo\_pendiente} = \text{total\_neto} - \sum \text{pagos}$. Si $\text{saldo\_pendiente} < 0$, la función RPC aborta la transacción y registra el intento anómalo en `auditoria_financiera`.
+
+### 3.9 Identificación Mínima Obligatoria de Clientes con Saldo Pendiente (`RN-VTA-003`)
+- Queda prohibida la entrega de mercadería fiada a clientes anónimos.
+- El modelo relacional en PostgreSQL y SQLite impone la restricción de integridad a nivel de tabla:
+  ```sql
+  CHECK (
+    saldo_pendiente = 0 OR (
+      cliente_nombre IS NOT NULL AND LENGTH(TRIM(cliente_nombre)) >= 3 AND
+      cliente_documento IS NOT NULL AND LENGTH(TRIM(cliente_documento)) >= 6
+    )
+  )
+  ```
+- Exige capturar el nombre del cliente y su documento de identidad (DNI/CE) o número telefónico de contacto antes de confirmar la entrega con saldo pendiente.
 
 ---
 

@@ -181,16 +181,20 @@ Cada decisión cuenta con un identificador único, fecha de registro, estado, co
 ### DEC-015: Estrategia de cifrado de base de datos local SQLite
 - **Estado:** Propuesto (Recomendado en H02 - Pendiente de aprobación formal)
 - **Fecha:** 2026-11-15
-- **Contexto:** Proteger datos comerciales y sensibles en dispositivos móviles de mostrador ante sustracción o rooteo.
+- **Contexto:** Proteger datos comerciales y sensibles en dispositivos móviles de mostrador ante sustracción física o rooteo del dispositivo.
 - **Alternativas Evaluadas:**
-  1. *SQLCipher (Cifrado completo de base de datos a nivel de página):* Desventaja: sobrecarga de I/O, configuración nativa compleja y riesgo de pérdida total si se corrompe la clave en Keystore.
-  2. *Cifrado Híbrido (Protección de sandbox SO Android FBE + Android Keystore con `expo-secure-store` para campos sensibles):* SQLite reside en almacenamiento privado interno; tokens JWT, PINs y cuentas bancarias de proveedores (`RN-PRV-002`) se cifran con AES-256 antes de persistir.
-  3. *Solo Sandbox del SO Android:* Desventaja: vulnerable en equipos rooteados con depuración ADB activa.
-- **Recomendación H02:** **Cifrado Híbrido (Protección de Sandbox SO + Android Keystore con `expo-secure-store`)**.
-- **Justificación:** Cumple `SEC-DAT-001` y `SEC-DAT-002`, mantiene el rendimiento de SQLite sin sobrecarga I/O y elimina la fragilidad operacional de SQLCipher.
-- **Riesgos Técnicos Identificados:** Datos de catálogo o notas de venta no confidenciales quedan accesibles en la base de datos si un atacante rootea el dispositivo e inspecciona el sandbox.
+  1. *SQLCipher (Cifrado completo de base de datos a nivel de página):* Ofrece cifrado homogéneo de todo el archivo SQLite. Desventajas: sobrecarga de CPU/IO de un 15-25% en operaciones frecuentes de mostrador en hardware modesto; complejidad de integración con Expo (requiere módulo nativo personalizado); fragilidad crítica: si la clave maestra en el Keystore se corrompe o se desincroniza, toda la base de datos local queda irremediablemente ilegible y corrompida.
+  2. *Cifrado Híbrido por Campos (Sandbox SO Android FBE + Android Keystore con `expo-secure-store` y AES-256-GCM):* La base de datos SQLite estándar aprovecha el aislamiento del sandbox de Android y el cifrado de disco del sistema operativo (File-Based Encryption). Los campos de alta sensibilidad (`numero_cuenta_cifrado` de proveedores, PINs, tokens GoTrue) se cifran a nivel de aplicación con AES-256-GCM antes de persistir.
+  3. *Solo Sandbox del SO Android:* Sin cifrado adicional a nivel aplicativo. Desventaja: vulnerable si el dispositivo es rooteado o intervenido mediante depuración ADB.
+- **Recomendación H02 / H04:** **Cifrado Híbrido por Campos (Sandbox SO + Android Keystore con `expo-secure-store`)**.
+- **Justificación:** Cumple `SEC-DATA-001` y `SEC-DATA-002`, mantiene el rendimiento de SQLite nativo (`PRAGMA synchronous = FULL` para finanzas), simplifica la compatibilidad con Expo y elimina el riesgo de corrupción total de base de datos inherente a SQLCipher.
+- **Ciclo de Vida de Claves y Compensaciones de Recuperación:**
+  - *Generación:* Clave simétrica AES-256 generada por hardware criptográfico en Android Keystore durante el primer inicio de sesión del operador.
+  - *Rotación:* Al modificarse el PIN del supervisor o tras intervalos programados (90 días), se ejecuta un proceso en segundo plano que desencripta con la clave vigente y reencripta con la nueva clave generada antes de invalidar la anterior.
+  - *Recuperación:* A diferencia de SQLCipher (donde la pérdida de clave destruye toda la base de datos local), con el cifrado por campos, si se daña la clave local o se cambia de dispositivo, la base de datos se recrea y los datos sensibles maestros se restauran de forma transparente y segura mediante re-sincronización autenticada desde Supabase.
+- **Riesgos Técnicos Identificados:** Datos de catálogo o notas de venta no confidenciales quedan accesibles en la base de datos local si un atacante rootea el dispositivo e inspecciona el sandbox.
 - **Mitigación Arquitectónica:** Limitar los datos almacenados localmente a lo indispensable para la operación de mostrador y cifrar todos los campos que contengan datos personales o financieros.
-- **Referencias:** [ARQUITECTURA.md](../02-arquitectura/ARQUITECTURA.md#8-matriz-de-evaluación-tecnológica), [HARDENING.md](../04-seguridad/HARDENING.md).
+- **Referencias:** [ARQUITECTURA.md](../02-arquitectura/ARQUITECTURA.md#8-matriz-de-evaluación-tecnológica), [HARDENING.md](../04-seguridad/HARDENING.md#23-seguridad-de-datos-locales-en-dispositivo-sec-data).
 
 ### DEC-016: Política de descuentos máximos delegados
 - **Estado:** Propuesto (Pendiente de decisión del Dueño / Interesados)

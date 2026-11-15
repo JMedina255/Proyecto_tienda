@@ -22,8 +22,8 @@ flowchart TD
     H01_1 --> H02["H02: Arquitectura del Sistema\ny Sincronización Offline (Completado)"]
     H02 --> H02_1["H02.1: Correcciones Críticas\nde Arquitectura (Completado)"]
     H02_1 --> H03["H03: Modelo y Diccionario\nde Datos Relacional (Completado)"]
-    H03 --> H04["H04: Estándares de Programación\ny Hardening de Seguridad (Hito Activo)"]
-    H04 --> H05["H05: Planificación Técnica,\nPruebas y Criterios"]
+    H03 --> H04["H04: Estándares de Programación\ny Hardening de Seguridad (Completado)"]
+    H04 --> H05["H05: Planificación Técnica,\nPruebas y Criterios (Hito Activo)"]
     H05 --> H06["H06: Preparación del Monorepo,\nPersistencia e Infraestructura Sync (Gate)"]
     H06 -.-> H07["H07+: Desarrollo Iterativo de\nMódulos sobre Capa Sync Base"]
 ```
@@ -140,16 +140,16 @@ A partir de H00.2, cada hito completado tiene como entregable mandatorio:
 ---
 
 ### Hito H04: Estándares de Programación y Hardening de Seguridad
-- **Objetivo:** Definir las directrices estrictas de desarrollo, linters, arquitectura de componentes y la especificación detallada de los controles de seguridad.
+- **Objetivo:** Definir las directrices estrictas de desarrollo, linters, arquitectura modular de componentes y la especificación detallada de los controles de seguridad con resolución de observaciones pendientes de H03.
 - **Dependencias:** H02, H02.1, H03.
 - **Entregables:**
-  - Reglas de codificación consolidadas en [ESTANDAR_PROGRAMACION.md](../03-estandares/ESTANDAR_PROGRAMACION.md).
-  - Resolución formal de `DEC-015` (estrategia de cifrado en reposo para SQLite local).
-  - Especificación de políticas Row Level Security (RLS) para PostgreSQL en Supabase.
-  - Diseño del almacenamiento seguro de credenciales con Android Keystore / `expo-secure-store`.
-  - Definición de procedimientos de auditoría de seguridad y sanitización de datos.
-- **Criterios de Aceptación:** Matriz de seguridad [HARDENING.md](../04-seguridad/HARDENING.md) con controles detallados y criterios de verificación técnica.
-- **Estado:** **Hito Activo / Próximo hito.**
+  - Correcciones del modelo relacional: persistencia monetaria en SQLite como `INTEGER` en céntimos, WhatsApp y especialidades de proveedores, series multi-terminal `UNIQUE(serie, correlativo)`, validación transaccional de saldos derivados y restricción `CHECK` de identificación mínima en fiados.
+  - Reglas de codificación consolidadas en [ESTANDAR_PROGRAMACION.md](../03-estandares/ESTANDAR_PROGRAMACION.md) (TypeScript estricto, vertical slices feature-based, Result pattern, Zod schemas, repositorios SQLite transaccionales y pirámide de pruebas con Vitest, RNTL y Maestro).
+  - Matriz de seguridad [HARDENING.md](../04-seguridad/HARDENING.md) reformateada estrictamente a `ID | Control | Riesgo | Verificación | Estado` (21 controles en estado `Pendiente`).
+  - Refinamiento de `DEC-015` en [DECISIONES.md](../06-gestion/DECISIONES.md) detallando gestión de ciclo de vida de claves, rotación y compensaciones de recuperación.
+  - **Entregable Git:** Commit `docs(h04): estandares de programacion y hardening` y push verificado a `origin/master`.
+- **Criterios de Aceptación:** Estándares de codificación y controles de seguridad 100% formalizados y trazables.
+- **Estado:** **Completado.**
 
 ---
 
@@ -162,6 +162,7 @@ A partir de H00.2, cada hito completado tiene como entregable mandatorio:
   - Criterios de aceptación para el pase de cada módulo a producción.
   - Aprobación formal de la línea base documental antes del inicio de codificación (*Quality Gate*).
 - **Criterios de Aceptación:** Documentación 100% aprobada sin decisiones pendientes ni vacíos técnicos.
+- **Estado:** **Hito Activo / Próximo hito.**
 
 ---
 

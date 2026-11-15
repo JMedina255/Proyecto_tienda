@@ -1,121 +1,172 @@
 # Estándar de Programación y Buenas Prácticas (ESTANDAR_PROGRAMACION.md)
 
-**Proyecto:** Sistema de Gestión de Librería — Proyecto Tienda  
-**Documento:** ESTANDAR_PROGRAMACION.md  
-**Estado:** Vigente / Aprobado para H00  
-**Trazabilidad:** [../02-arquitectura/ARQUITECTURA.md](../02-arquitectura/ARQUITECTURA.md) | [../../AGENTS.md](../../AGENTS.md)
+**Proyecto:** Sistema de Gestión de Librería — Proyecto Tienda<br>
+**Documento:** ESTANDAR_PROGRAMACION.md<br>
+**Estado:** Consolidado y Refinado en H04<br>
+**Trazabilidad:** [../02-arquitectura/ARQUITECTURA.md](../02-arquitectura/ARQUITECTURA.md) | [../02-arquitectura/MODELO_DATOS.md](../02-arquitectura/MODELO_DATOS.md) | [../04-seguridad/HARDENING.md](../04-seguridad/HARDENING.md) | [../../AGENTS.md](../../AGENTS.md)
 
 ---
 
-## 1. Convenciones de TypeScript
+## 1. Convenciones de TypeScript Estricto y Modelado de Dominio
 
-El proyecto exige el uso de TypeScript en modo estricto en todos los paquetes y aplicaciones:
+Todo el código fuente del monorepo se desarrollará en TypeScript bajo modo estricto continuo.
 
-### 1.1 Configuración de Compilación (`tsconfig.json`)
-- `"strict": true`: Activación obligatoria de todas las comprobaciones estrictas de tipos (`noImplicitAny`, `strictNullChecks`, `strictFunctionTypes`, `strictPropertyInitialization`).
-- Prohibición del tipo `any`: No se permite el uso de `any` sin justificación técnica documentada con `// eslint-disable-next-line @typescript-eslint/no-explicit-any`. Para datos de origen incierto o APIs externas, utilizar `unknown` acompañado de validación en tiempo de ejecución (mediante esquemas `zod` o `valibot`).
-- Tipado explícito de retornos: Todas las funciones públicas, métodos de servicios y custom hooks deben declarar explícitamente su tipo de retorno.
+### 1.1 Configuración Mandatoria del Compilador (`tsconfig.json`)
+```json
+{
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "useUnknownInCatchVariables": true,
+    "noFallthroughCasesInSwitch": true
+  }
+}
+```
 
-### 1.2 Inmutabilidad y Modelado de Datos
-- Preferir `readonly` en arrays y propiedades de interfaces de dominio para evitar mutaciones accidentales del estado.
-- Utilizar discriminadores explícitos (*Tagged Unions*) para representar estados complejos de negocio:
+### 1.2 Reglas de Tipado Estricto
+- **Prohibición de `any`:** Prohibido el uso de `any`. En fronteras de entrada o APIs externas, tipar como `unknown` y validar en tiempo de ejecución mediante esquemas Zod antes de acceder a sus propiedades.
+- **Tipado Explícito en Funciones Públicas:** Todo servicio, hook y función exportada debe declarar su tipo de retorno explícito.
+- **Discriminadores y Tagged Unions:** Los estados de entidades deben modelarse como uniones etiquetadas exhaustivas para forzar validación en tiempo de compilación:
   ```typescript
-  // Ejemplo de modelo de estado de pago tipado
+  export type EstadoVenta = 'borrador' | 'completada' | 'pendiente_regularizacion' | 'anulada';
   export type EstadoPago = 'pendiente' | 'parcial' | 'total' | 'anulado';
+  export type EstadoEntrega = 'retenido' | 'entregado_total' | 'entregado_saldo_pendiente';
+  ```
 
-  export type ResultadoVenta =
-    | { readonly ok: true; readonly ventaId: string; readonly totalNeto: number }
-    | { readonly ok: false; readonly codigoError: string; readonly mensaje: string };
+### 1.3 Representación y Manejo de Dinero en Código
+Para evitar descalces y pérdida de precisión aritmética por coma flotante IEEE 754:
+- En memoria y en SQLite local, los importes se manipulan estrictamente como **enteros en céntimos** (`type Cents = number`).
+- En Supabase (PostgreSQL), la representación canónica es `NUMERIC(12,2)`.
+- Conversión y utilidades puras obligatorias:
+  ```typescript
+  export type Centavos = number & { readonly __brand: unique symbol };
+
+  export const toCentavos = (soles: number): Centavos =>
+    Math.round(soles * 100) as Centavos;
+
+  export const toSoles = (centavos: Centavos): number =>
+    centavos / 100;
+
+  export const formatMoneda = (centavos: Centavos): string =>
+    `S/ ${(centavos / 100).toFixed(2)}`;
   ```
 
 ---
 
-## 2. Convenciones para React Native y Expo
+## 2. Organización Modular por Características (*Feature-Based*)
 
-### 2.1 Componentes y Hooks
-- Uso exclusivo de **Componentes Funcionales** con TypeScript (`React.FC` o tipado directo de props).
-- La lógica de negocio, cálculos de ventas y llamadas a la base de datos local SQLite deben encapsularse en **Custom Hooks** o **Servicios de Dominio**, manteniendo los componentes visuales enfocados en la presentación.
-- Manejo de ciclo de vida seguro con hooks estándar (`useEffect`, `useCallback`, `useMemo`). Todo efecto debe contar con función de limpieza (*cleanup function*) cuando suscriba listeners o tareas asíncronas.
+El proyecto adopta una estructura de monorepo orientada a dominios funcionales independientes (*Vertical Slices*).
 
-### 2.2 Rendimiento en Dispositivos Móviles
-- Evitar la creación de objetos, funciones anónimas o arrays en línea dentro de la propiedad `render` o en JSX en bucles de alta frecuencia.
-- Uso mandatorio de listas virtualizadas optimizadas (`FlashList` o `FlatList`) con `keyExtractor` estable basado en UUID para catálogos y listas de ventas.
-- Los elementos interactivos táctiles deben cumplir una superficie mínima accesible de **48x48 dp** para agilizar la interacción en mostrador.
+### 2.1 Topología del Monorepo
+```
+proyecto-tienda/
+├── apps/
+│   ├── mobile/                  # Aplicación React Native + Expo (Android)
+│   └── web/                     # Futuro panel administrativo React
+├── packages/
+│   ├── shared-types/            # Tipos de dominio, DTOs y contratos compartidos
+│   ├── database/                # Esquemas SQLite, migraciones y repositorios base
+│   ├── sync-engine/             # Motor outbox, idempotencia y resolución de conflictos
+│   └── ui/                      # Componentes visuales y sistema de diseño compartido
+```
 
-### 2.3 Estilos y Tematización
-- Mantener consistencia visual utilizando hojas de estilo compiladas o utilidades semánticas (`StyleSheet.create` o `Tailwind / NativeWind`).
-- Centralizar constantes de diseño (paleta de colores, espaciados, tipografías) en el paquete de UI o tema compartido.
-
----
-
-## 3. Convenciones para el Futuro Panel Web (React)
-
-- Los componentes del panel web consumirán los mismos tipos de dominio desde `@tienda/shared-types`.
-- Adhesión a los mismos principios de componentes funcionales y separación de responsabilidades.
-- Uso de componentes accesibles (WAI-ARIA) y navegación clara orientada a teclado y ratón.
-
----
-
-## 4. Nomenclatura y Estructura de Archivos
-
-| Elemento | Convención | Ejemplo |
-| :--- | :--- | :--- |
-| **Componentes React / Screens** | `PascalCase` | `VentaMostradorScreen.tsx`, `BotonCobro.tsx` |
-| **Custom Hooks** | `camelCase` con prefijo `use` | `useSesionCaja.ts`, `useVentaDetalle.ts` |
-| **Servicios / Utilidades** | `camelCase` o `kebab-case` | `syncEngine.ts`, `calculoDescuentos.ts` |
-| **Tipos e Interfaces** | `PascalCase` | `VentaHeader`, `DetalleItemVenta` |
-| **Enums y Constantes** | `UPPER_SNAKE_CASE` | `ESTADOS_VENTA`, `MAX_INTENTOS_REINTENTO` |
-| **Carpetas de módulos** | `kebab-case` o `camelCase` uniforme | `sync-engine/`, `shared-types/`, `screens/` |
-| **Tablas y Columnas de Base de Datos** | `snake_case` | `sesiones_caja`, `monto_final_calculado` |
+### 2.2 Arquitectura Interna de Features (`features/[nombre]/`)
+Cada módulo funcional (`ventas`, `caja`, `catalogo`, `proveedores`, `gastos`) se organiza en capas internas:
+- `components/`: Componentes puramente presentacionales sin dependencias de base de datos.
+- `hooks/`: Hooks de orquestación reactiva y estado local de pantalla.
+- `services/`: Reglas de negocio puras, cálculos financieros y validaciones.
+- `repositories/`: Clases de acceso a datos que encapsulan consultas SQL o llamadas Supabase.
+- `schemas/`: Esquemas de validación Zod de entradas y formularios.
+- `types/`: Tipos específicos e interfaces de la característica.
 
 ---
 
-## 5. Formato y Calidad de Código (Linting & Formatting)
+## 3. Convenciones para React Native y Expo
 
-- **ESLint:** Configuración estricta basada en `@typescript-eslint/recommended`, `eslint-plugin-react` y `eslint-plugin-react-hooks`.
-- **Prettier:** Formateo automático uniforme:
-  - `printWidth: 100`
-  - `tabWidth: 2`
-  - `singleQuote: true`
-  - `trailingComma: 'all'`
-  - `semi: true`
-- **Git Hooks (Previsto en H01):** Ejecución de linting y comprobación de tipos antes de cada commit mediante `husky` y `lint-staged`.
+### 3.1 Componentes y Responsabilidades
+- **Separación de Responsabilidades:** Los componentes reciben datos mediante props y emiten eventos mediante callbacks; no ejecutan consultas SQL ni mutaciones directas.
+- **Renderizado Eficiente:** Evitar funciones flecha u objetos literales en bucles de render. Utilizar `useCallback` y `useMemo` en cálculos derivados complejos.
+- **Virtualización de Listas:** Uso mandatorio de `@shopify/flash-list` para catálogos y transacciones de caja, con `estimatedItemSize` y `keyExtractor` unívoco basado en UUID v4.
+- **Accesibilidad y Ergonomía:** Áreas táctiles con un tamaño mínimo de **48x48 dp** (`hitSlop`), contraste cromático WCAG AA y soporte de teclado numérico en mostrador.
+
+---
+
+## 4. Persistencia y Patrón Repositorio (SQLite y Supabase)
+
+### 4.1 SQLite Local (`expo-sqlite`)
+- **Parámetros Preparados Obligatorios:** Queda estrictamente prohibida la interpolación directa de variables en cadenas SQL. Todas las consultas deben usar parámetros enlazados (`?`):
+  ```typescript
+  await db.runAsync(
+    'INSERT INTO ventas (id, sesion_caja_id, total_neto, ...) VALUES (?, ?, ?, ...)',
+    [venta.id, venta.sesionCajaId, venta.totalNeto]
+  );
+  ```
+- **Transacciones Atómicas Explícitas:** Las mutaciones compuestas (ej. venta + detalles + pago + outbox) deben ejecutarse de forma indivisible mediante `withTransactionAsync` o bloques `BEGIN IMMEDIATE ... COMMIT`:
+  ```typescript
+  await db.withTransactionAsync(async () => {
+    await ventaRepo.insert(venta);
+    await pagoRepo.insert(pago);
+    await outboxRepo.enqueue(mutation);
+  });
+  ```
+- **Durabilidad:** Transacciones financieras aplican `PRAGMA synchronous = FULL;` para garantizar persistencia física (*fsync*) en almacenamiento interno seguro.
+
+### 4.2 Cliente Supabase Remoto
+- **Tipado Fuerte Generado:** El cliente de Supabase debe instanciarse con los tipos generados de PostgreSQL: `createClient<Database>(url, anonKey)`.
+- **Prohibición de Service Role Key:** En la aplicación cliente móvil solo se permite empaquetar `SUPABASE_ANON_KEY`. La `service_role_key` queda estrictamente vetada en el cliente ([SEC-SECR-002](../04-seguridad/HARDENING.md#26-protección-de-secretos-y-configuración-sec-secr)).
+- **Funciones RPC:** Las llamadas a lógica de servidor deben invocarse mediante RPCs parametrizadas con validación de roles y control de privilegios.
+
+---
+
+## 5. Validación en Fronteras y Manejo de Errores
+
+### 5.1 Esquemas Zod en Fronteras de Entrada
+Toda entrada externa (formularios de usuario, resultados de escaneo de cámara OCR, payloads de sincronización) debe validarse con Zod:
+```typescript
+export const PagoSchema = z.object({
+  id: z.string().uuid(),
+  ventaId: z.string().uuid(),
+  montoCéntimos: z.number().int().positive(),
+  medioPago: z.enum(['efectivo', 'tarjeta_pos', 'billetera_digital']),
+  idempotencyKey: z.string().length(64),
+});
+```
+
+### 5.2 Patrón Result y Manejo de Excepciones
+- Las funciones de negocio no deben arrojar excepciones no controladas para flujos esperados; retornan tipos `Result<T, E>`:
+  ```typescript
+  export type Result<T, E = Error> =
+    | { readonly ok: true; readonly value: T }
+    | { readonly ok: false; readonly error: E };
+  ```
+- **Aislamiento de Errores Visuales:** *Error Boundaries* en la raíz y en pantallas principales para evitar cierres abruptos de la aplicación (*Crash Zero*).
+- **Resiliencia de Red:** Las fallas de conexión nunca deben bloquear al usuario en mostrador; la mutación se persiste en SQLite y se encola en `sync_outbox`.
 
 ---
 
 ## 6. Estrategia de Pruebas Automatizadas
 
-La confiabilidad del sistema de mostrador descansa en una pirámide de pruebas automatizadas:
+La calidad del software se valida mediante una pirámide de pruebas automatizadas:
 
-```
-          ▲
-         / \     E2E / Flujos Completos (Maestro)
-        /   \    (Detox / Maestro en Android)
-       /─────\
-      /       \   Integración / Componentes
-     /         \  (React Native Testing Library + SQLite en memoria)
-    /───────────\
-   /             \ Pruebas Unitarias de Dominio
-  /               \(Vitest / Jest: cálculos, sincronización, reglas)
- └─────────────────┘
-```
-
-1. **Pruebas Unitarias:**
-   - Cobertura mandatoria sobre la lógica financiera: cálculo de totales, desglose de descuentos, cuadre de caja (arqueo teórico vs. declarado), y resolución de conflictos de sincronización.
-2. **Pruebas de Componentes:**
-   - Validar comportamiento de formularios de venta, validación de montos numéricos y bloqueo de interfaces en modo lectura.
-3. **Pruebas de Resiliencia Offline:**
-   - Pruebas automatizadas que simulan fallas de red durante transacciones de venta para comprobar que los datos persisten intactos en SQLite.
+| Nivel | Herramienta | Alcance y Objetivos |
+| :--- | :--- | :--- |
+| **Unitarias** | Vitest | Lógica financiera, cálculo de descuentos, conversiones monetarias, validación de saldos y motor de idempotencia. Cobertura mínima esperada: 85% en dominio. |
+| **Integración** | React Native Testing Library + SQLite en memoria | Formularios de venta, pantallas de arqueo, persistencia local y manejo de estados offline sin dependencias de red. |
+| **End-to-End (E2E)** | Maestro (Android) | Flujos operativos completos en dispositivo real o emulador: Apertura de turno -> Venta rápida con captura fotográfica -> Regularización -> Cierre y arqueo. |
 
 ---
 
-## 7. Manejo de Errores y Resiliencia
+## 7. Formato, Linting y Gestión de Versiones
 
-1. **Evitar pantallas blancas de error (*Crash Zero*):**
-   - Implementar *Error Boundaries* en la raíz y en las secciones principales de la app móvil para aislar errores de renderizado.
-2. **Patrón Result en lógica de negocio:**
-   - Las operaciones de dominio susceptibles a fallos previsibles (p. ej. venta sin caja abierta, dinero insuficiente, producto no encontrado) deben retornar objetos tipados de resultado en lugar de arrojar excepciones no controladas.
-3. **Manejo de Errores en Red y Sincronización:**
-   - Ninguna excepción de red debe propagarse a la interfaz de usuario como un error bloqueante. Todo fallo de comunicación debe registrarse en la cola de reintentos (*Outbox*) con retroceso exponencial (*exponential backoff*).
-4. **Registro de Auditoría Local:**
-   - Los fallos graves deben registrarse en una tabla local de auditoría para permitir su diagnóstico técnico posterior sin comprometer datos confidenciales.
+- **ESLint & Prettier:** Configuración estricta en el monorepo (`printWidth: 100`, `tabWidth: 2`, `singleQuote: true`, `semi: true`, `trailingComma: 'all'`).
+- **Verificación Pre-Commit:** Inspección obligatoria de `git diff --check`, tipado (`tsc --noEmit`) y pruebas unitarias antes de confirmar commits.
+- **Conventional Commits:** Adhesión estricta a la convención (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`).
+- **Sincronización Atómica Código-Documentación:** Cualquier modificación en entidades, esquemas, reglas o interfaces debe comitearse junto con la actualización de los documentos en `docs/`.

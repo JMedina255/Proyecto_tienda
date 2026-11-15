@@ -165,9 +165,9 @@ Toda la documentación técnica y de gestión del proyecto reside en el director
 | Parámetro | Estado |
 | :--- | :--- |
 | **Fase actual** | Fase 1 — Especificación Funcional y Diseño de Arquitectura |
-| **Hito completado recientemente** | **H03 — Diseño del modelo y diccionario de datos** |
-| **Hitos cerrados** | **H00** (Inicialización), **H00.1** (Auditoría), **H00.2** (Git y versionado), **H01** (SRS y reglas), **H01.1** (Simplificación y normalización), **H02** (Arquitectura), **H02.1** (Correcciones críticas), **H03** (Modelo y diccionario) |
+| **Hito completado recientemente** | **H04 — Estándares de programación y hardening de seguridad** |
+| **Hitos cerrados** | **H00** (Inicialización), **H00.1** (Auditoría), **H00.2** (Git y versionado), **H01** (SRS y reglas), **H01.1** (Simplificación y normalización), **H02** (Arquitectura), **H02.1** (Correcciones críticas), **H03** (Modelo y diccionario), **H04** (Estándares y hardening) |
 | **Repositorio remoto** | [https://github.com/JMedina255/Proyecto_tienda.git](https://github.com/JMedina255/Proyecto_tienda) (rama `master`) |
 | **Código fuente** | Aún no iniciado (Sujeto a aprobación formal al concluir H05) |
 | **Servicios externos** | Sin provisionar (Pendiente de configuración en hitos posteriores) |
-| **Próximo hito** | **H04:** Estándares de programación y hardening de seguridad |
+| **Próximo hito** | **H05:** Planificación técnica, pruebas y criterios de aceptación |
