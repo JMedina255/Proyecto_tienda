@@ -5,7 +5,7 @@
  */
 
 import type { SyncMutation, SyncStatus, SyncOperation } from '@tienda/shared-types';
-import type { SqliteDriver } from './types.js';
+import type { SqliteTransactionDriver } from './types.js';
 
 interface OutboxRow {
   id: string;
@@ -22,17 +22,20 @@ interface OutboxRow {
 }
 
 export class OutboxRepository {
-  constructor(private readonly db: SqliteDriver) {}
+  constructor(private readonly db: SqliteTransactionDriver) {}
 
   /**
    * Encola una nueva mutación en la tabla sync_outbox.
+   * Si se pasa un objeto transaccional customDb (txn), la inserción se ejecuta
+   * dentro de dicho contexto atómico.
    * Si ya existe la clave de idempotencia, lanza error de restricción UNIQUE.
    */
-  async enqueue(mutation: SyncMutation): Promise<void> {
+  async enqueue(mutation: SyncMutation, customDb?: SqliteTransactionDriver): Promise<void> {
+    const targetDb = customDb ?? this.db;
     const payloadJson = JSON.stringify(mutation.payload);
     const now = mutation.createdAt || new Date().toISOString();
 
-    await this.db.runAsync(
+    await targetDb.runAsync(
       `INSERT INTO sync_outbox (
         id, entity_type, entity_id, operation, payload, idempotency_key,
         status, retry_count, last_error, created_at, updated_at

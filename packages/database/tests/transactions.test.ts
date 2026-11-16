@@ -49,10 +49,10 @@ describe('Semántica Transaccional y Atomicidad Financiera (withExclusiveTransac
     createdAt: new Date().toISOString(),
   };
 
-  it('confirma atómicamente la entidad local y la mutación outbox si no hay error', async () => {
-    await db.withExclusiveTransactionAsync(async () => {
-      await db.runAsync('INSERT INTO demo_ventas (id, total_neto) VALUES (?, ?);', mutation.entityId, 1500);
-      await outboxRepo.enqueue(mutation);
+  it('confirma atómicamente la entidad local y la mutación outbox ejecutando mediante txn', async () => {
+    await db.withExclusiveTransactionAsync(async (txn) => {
+      await txn.runAsync('INSERT INTO demo_ventas (id, total_neto) VALUES (?, ?);', mutation.entityId, 1500);
+      await outboxRepo.enqueue(mutation, txn);
     });
 
     // Verificamos persistencia de ambos
@@ -65,9 +65,9 @@ describe('Semántica Transaccional y Atomicidad Financiera (withExclusiveTransac
   });
 
   it('revierte íntegramente la transacción si ocurre un fallo a mitad de la operación', async () => {
-    const taskFailed = db.withExclusiveTransactionAsync(async () => {
-      await db.runAsync('INSERT INTO demo_ventas (id, total_neto) VALUES (?, ?);', mutation.entityId, 1500);
-      await outboxRepo.enqueue(mutation);
+    const taskFailed = db.withExclusiveTransactionAsync(async (txn) => {
+      await txn.runAsync('INSERT INTO demo_ventas (id, total_neto) VALUES (?, ?);', mutation.entityId, 1500);
+      await outboxRepo.enqueue(mutation, txn);
       // Simulamos excepción imprevista (p. ej. fallo de validación o caída)
       throw new Error('Fallo crítico simulado durante el flujo transaccional');
     });
@@ -82,17 +82,48 @@ describe('Semántica Transaccional y Atomicidad Financiera (withExclusiveTransac
     expect(pending.length).toBe(0);
   });
 
-  it('hace cumplir las restricciones de clave foránea dentro de la transacción', async () => {
-    const invalidFkTask = db.withExclusiveTransactionAsync(async () => {
-      // Intentamos insertar un pago para una venta inexistente
-      await db.runAsync(
+  it('hace cumplir las restricciones de clave foránea dentro de la transacción y revierte escrituras previas', async () => {
+    const invalidFkTask = db.withExclusiveTransactionAsync(async (txn) => {
+      // 1. Insertamos venta válida
+      await txn.runAsync('INSERT INTO demo_ventas (id, total_neto) VALUES (?, ?);', 'venta-valida-1', 2000);
+      // 2. Intentamos insertar un pago para una venta inexistente (viola FK)
+      await txn.runAsync(
         'INSERT INTO demo_pagos (id, venta_id, monto) VALUES (?, ?, ?);',
-        'pago-1',
+        'pago-invalido-1',
         'venta-inexistente-uuid',
         1000,
       );
     });
 
     await expect(invalidFkTask).rejects.toThrow(/FOREIGN KEY/i);
+
+    // Como falló la FK, la venta 'venta-valida-1' también debe haber sido revertida
+    const venta = await db.getFirstAsync<{ id: string }>('SELECT id FROM demo_ventas WHERE id = ?;', 'venta-valida-1');
+    expect(venta).toBeNull();
+  });
+
+  it('revierte la transacción completa si se intenta duplicar una clave de idempotencia', async () => {
+    // 1. Primera inserción exitosa
+    await db.withExclusiveTransactionAsync(async (txn) => {
+      await txn.runAsync('INSERT INTO demo_ventas (id, total_neto) VALUES (?, ?);', mutation.entityId, 1500);
+      await outboxRepo.enqueue(mutation, txn);
+    });
+
+    // 2. Segundo intento con mismo idempotencyKey pero diferente venta
+    const duplicateTask = db.withExclusiveTransactionAsync(async (txn) => {
+      await txn.runAsync('INSERT INTO demo_ventas (id, total_neto) VALUES (?, ?);', 'venta-segunda-duplicada', 3000);
+      // Falla por UNIQUE(idempotency_key)
+      await outboxRepo.enqueue({ ...mutation, id: 'nueva-mutacion-id', entityId: 'venta-segunda-duplicada' }, txn);
+    });
+
+    await expect(duplicateTask).rejects.toThrow(/UNIQUE/i);
+
+    // La segunda venta 'venta-segunda-duplicada' no debe existir
+    const venta2 = await db.getFirstAsync('SELECT id FROM demo_ventas WHERE id = ?;', 'venta-segunda-duplicada');
+    expect(venta2).toBeNull();
+
+    // Solo debe quedar 1 mutación en outbox
+    const count = await outboxRepo.countPending();
+    expect(count).toBe(1);
   });
 });

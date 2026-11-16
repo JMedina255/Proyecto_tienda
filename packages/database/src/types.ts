@@ -9,9 +9,12 @@ export interface RunResult {
   readonly changes: number;
 }
 
-export interface SqliteDriver {
+/**
+ * Operaciones DML/DQL ejecutables dentro de una conexión o contexto transaccional.
+ */
+export interface SqliteTransactionDriver {
   /**
-   * Ejecuta sentencias DDL o scripts SQL compuestos (múltiples comandos separados por punto y coma).
+   * Ejecuta sentencias DDL o scripts SQL compuestos.
    */
   execAsync(sql: string): Promise<void>;
 
@@ -29,18 +32,25 @@ export interface SqliteDriver {
    * Ejecuta una consulta SELECT y retorna todas las filas encontradas.
    */
   getAllAsync<T = unknown>(sql: string, ...params: unknown[]): Promise<T[]>;
+}
 
+/**
+ * Contrato principal del motor SQLite, incluyendo control transaccional estricto y cierre de conexión.
+ */
+export interface SqliteDriver extends SqliteTransactionDriver {
   /**
-   * Ejecuta una transacción diferida estándar (savepoints / BEGIN DEFERRED).
+   * Ejecuta una transacción diferida estándar (BEGIN DEFERRED).
+   * Pasa un objeto `txn` que debe utilizarse para ejecutar todas las operaciones internas.
    */
-  withTransactionAsync(task: () => Promise<void>): Promise<void>;
+  withTransactionAsync<T = void>(task: (txn: SqliteTransactionDriver) => Promise<T>): Promise<T>;
 
   /**
    * Ejecuta una transacción exclusiva estricta (BEGIN IMMEDIATE / EXCLUSIVE).
-   * Adquiere bloqueo reservado de escritura inmediatamente para evitar SQLITE_BUSY
-   * o condiciones de carrera en operaciones financieras críticas.
+   * Adquiere bloqueo reservado de escritura inmediatamente para evitar SQLITE_BUSY.
+   * Pasa un objeto `txn` que debe utilizarse para todas las operaciones internas,
+   * evitando que se ejecuten escrituras fuera de la transacción.
    */
-  withExclusiveTransactionAsync(task: () => Promise<void>): Promise<void>;
+  withExclusiveTransactionAsync<T = void>(task: (txn: SqliteTransactionDriver) => Promise<T>): Promise<T>;
 
   /**
    * Cierra la conexión física a la base de datos.
@@ -63,7 +73,7 @@ export interface ExpoSqliteDatabaseLike {
   runAsync(sql: string, ...params: unknown[]): Promise<{ lastInsertRowId: number; changes: number }>;
   getFirstAsync<T = unknown>(sql: string, ...params: unknown[]): Promise<T | null>;
   getAllAsync<T = unknown>(sql: string, ...params: unknown[]): Promise<T[]>;
-  withTransactionAsync(task: () => Promise<void>): Promise<void>;
-  withExclusiveTransactionAsync(task: () => Promise<void>): Promise<void>;
-  closeAsync(): Promise<void>;
+  withTransactionAsync?(task: () => Promise<void>): Promise<void>;
+  withExclusiveTransactionAsync?(task: (txn: any) => Promise<void>): Promise<void>;
+  closeAsync?(): Promise<void>;
 }

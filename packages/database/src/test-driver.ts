@@ -6,7 +6,7 @@
  */
 
 import Database, { type Database as BetterSqliteDatabase } from 'better-sqlite3';
-import type { SqliteDriver, RunResult } from './types.js';
+import type { SqliteDriver, SqliteTransactionDriver, RunResult } from './types.js';
 
 export class BetterSqliteDriver implements SqliteDriver {
   private db: BetterSqliteDatabase | null;
@@ -46,25 +46,27 @@ export class BetterSqliteDriver implements SqliteDriver {
     return stmt.all(...params) as T[];
   }
 
-  async withTransactionAsync(task: () => Promise<void>): Promise<void> {
+  async withTransactionAsync<T = void>(task: (txn: SqliteTransactionDriver) => Promise<T>): Promise<T> {
     const db = this.getDb();
     db.exec('BEGIN DEFERRED;');
     try {
-      await task();
+      const result = await task(this);
       db.exec('COMMIT;');
+      return result;
     } catch (err) {
       db.exec('ROLLBACK;');
       throw err;
     }
   }
 
-  async withExclusiveTransactionAsync(task: () => Promise<void>): Promise<void> {
+  async withExclusiveTransactionAsync<T = void>(task: (txn: SqliteTransactionDriver) => Promise<T>): Promise<T> {
     const db = this.getDb();
     // Bloqueo reservado de escritura inmediato (BEGIN IMMEDIATE) para evitar interrupciones o SQLITE_BUSY
     db.exec('BEGIN IMMEDIATE;');
     try {
-      await task();
+      const result = await task(this);
       db.exec('COMMIT;');
+      return result;
     } catch (err) {
       db.exec('ROLLBACK;');
       throw err;

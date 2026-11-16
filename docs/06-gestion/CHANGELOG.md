@@ -6,6 +6,40 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [0.1.2] - 2026-11-15 (Hito H06.2 — Corrección Transaccional y Preparación de Supabase)
+
+### Añadido
+- **Infraestructura Local de Supabase (`supabase/`):**
+  - Archivo `supabase/config.toml` vinculado al proyecto `hixrwpiyyhrifsxgekfe` (PostgreSQL 17).
+  - Migración declarativa versionada `supabase/migrations/20261115000001_sync_infrastructure.sql` con tabla `sync_processed_mutations`, RLS estricto y función RPC `sync_push_mutations` con anti-spoofing (`auth.uid()`), lista blanca de entidades y deduplicación por clave de idempotencia.
+- **Suite de Pruebas de Seguridad RPC (`packages/sync-engine/tests/rpc-security.test.ts`):**
+  - 5 tests unitarios verificando autenticación GoTrue, rechazo de suplantación de `usuario_id`, inyección SQL y RBAC para perfiles `vendedor`.
+- **Suite Automatizada de 6 Pruebas en Android (`apps/mobile/App.tsx`):**
+  - Monitor en vivo y suite de 6 pruebas transaccionales ejecutables en dispositivo móvil Pixel 8.
+
+### Corregido
+- **Atomicidad Transaccional y Claves Foráneas en Expo SQLite (`packages/database`):**
+  - Implementación de `AsyncTransactionMutex` y ejecución de transacciones exclusivas mediante `BEGIN IMMEDIATE;` sobre la conexión principal en `ExpoSqliteDriver`.
+  - Corrección de pérdida de integridad referencial: se evita el uso de subconexiones aisladas de Expo SDK 52 que desactivaban las claves foráneas, asegurando que `PRAGMA foreign_keys = ON;` permanezca 100% activo y que errores de FK aborten y reviertan de forma atómica todas las escrituras previas.
+  - Suministro obligatorio del objeto `txn` en `withExclusiveTransactionAsync` y `withTransactionAsync`.
+  - Inserción coordinada atómica de entidad de negocio y encolado en `sync_outbox` bajo la misma transacción mediante `outboxRepo.enqueue(mutation, txn)`.
+- **Ciclo de Vida de Conexión en Reapertura (`apps/mobile/App.tsx`):**
+  - Adopción de `useRef` para `driverRef` y `outboxRepoRef`, garantizando que tras cerrar la base de datos y reabrirla, las pruebas subsiguientes consulten la conexión activa y no una referencia cerrada.
+
+### Verificado
+- **6 Pruebas Transaccionales Aprobadas en Android Pixel 8 (100% PASS):**
+  - 1. Transacción confirmada: venta y detalle insertados atómicamente en `txn`.
+  - 2. Reversión por excepción: rollback completo ante error simulado (0 huérfanos).
+  - 3. Clave foránea inexistente: violación `SQLITE_CONSTRAINT_FOREIGNKEY` interceptada, abortando la transacción y revirtiendo escrituras.
+  - 4. Inserción atómica: registro de negocio y mutación en `sync_outbox` confirmados coordinadamente.
+  - 5. Reintento sin duplicación: restricción `UNIQUE(idempotency_key)` activa en SQLite local.
+  - 6. Reinicio y recuperación: cierre físico de la conexión, reapertura y verificación de persistencia íntegra en disco.
+- **Suites Automatizadas del Monorepo:**
+  - 47 pruebas automatizadas aprobadas (14 en `business-logic`, 18 en `database`, 15 en `sync-engine`).
+  - Verificación de tipos TypeScript (`pnpm typecheck`) con 9/9 tareas exitosas.
+
+---
+
 ## [0.1.1] - 2026-11-15 (Hito H06.1 — Estabilización Android y Verificación de Supabase)
 
 ### Añadido

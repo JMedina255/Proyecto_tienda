@@ -4,18 +4,18 @@
  * Trazabilidad: ARQUITECTURA.md §4.2, MODELO_DATOS.md §2.3
  */
 
-import type { SqliteDriver } from './types.js';
+import type { SqliteDriver, SqliteTransactionDriver } from './types.js';
 
 export interface Migration {
   readonly version: number;
   readonly name: string;
-  readonly up: (db: SqliteDriver) => Promise<void>;
+  readonly up: (db: SqliteTransactionDriver) => Promise<void>;
 }
 
 export const INITIAL_SYNC_MIGRATION: Migration = {
   version: 1,
   name: '001_initial_sync_schema',
-  up: async (db: SqliteDriver) => {
+  up: async (db: SqliteTransactionDriver) => {
     // 1. Tabla de cola local de mutaciones (Outbox)
     await db.execAsync(`
       CREATE TABLE IF NOT EXISTS sync_outbox (
@@ -75,6 +75,8 @@ export class MigrationRunner {
 
   /**
    * Ejecuta todas las migraciones pendientes de forma atómica y repetible.
+   * Utiliza el objeto transaccional 'txn' para ejecutar tanto el DDL como el registro
+   * en schema_migrations, asegurando que si la migración falla, nada persista.
    */
   async runMigrations(migrations: readonly Migration[] = CORE_MIGRATIONS): Promise<{ applied: number }> {
     await this.initMigrationTable();
@@ -86,10 +88,10 @@ export class MigrationRunner {
         continue;
       }
 
-      await this.db.withExclusiveTransactionAsync(async () => {
-        await migration.up(this.db);
+      await this.db.withExclusiveTransactionAsync(async (txn) => {
+        await migration.up(txn);
         const now = new Date().toISOString();
-        await this.db.runAsync(
+        await txn.runAsync(
           'INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?);',
           migration.version,
           migration.name,

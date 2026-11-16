@@ -3,6 +3,16 @@ import { ExpoSqliteDriver } from '../src/expo-driver.js';
 import type { ExpoSqliteDatabaseLike } from '../src/types.js';
 
 describe('Adaptador ExpoSqliteDriver (expo-driver.ts)', () => {
+  const fakeExpoTxn: ExpoSqliteDatabaseLike = {
+    execAsync: vi.fn().mockResolvedValue(undefined),
+    runAsync: vi.fn().mockResolvedValue({ lastInsertRowId: 99, changes: 1 }),
+    getFirstAsync: vi.fn().mockResolvedValue({ id: 'txn-row' }),
+    getAllAsync: vi.fn().mockResolvedValue([{ id: 'txn-row' }]),
+    withTransactionAsync: vi.fn(),
+    withExclusiveTransactionAsync: vi.fn(),
+    closeAsync: vi.fn().mockResolvedValue(undefined),
+  };
+
   const mockDb: ExpoSqliteDatabaseLike = {
     execAsync: vi.fn().mockResolvedValue(undefined),
     runAsync: vi.fn().mockResolvedValue({ lastInsertRowId: 1, changes: 1 }),
@@ -12,7 +22,7 @@ describe('Adaptador ExpoSqliteDriver (expo-driver.ts)', () => {
       await cb();
     }),
     withExclusiveTransactionAsync: vi.fn().mockImplementation(async (cb) => {
-      await cb();
+      await cb(fakeExpoTxn);
     }),
     closeAsync: vi.fn().mockResolvedValue(undefined),
   };
@@ -38,18 +48,25 @@ describe('Adaptador ExpoSqliteDriver (expo-driver.ts)', () => {
     expect(all).toHaveLength(2);
   });
 
-  it('delega withTransactionAsync y withExclusiveTransactionAsync', async () => {
-    let calledRegular = false;
-    await driver.withTransactionAsync(async () => {
-      calledRegular = true;
+  it('proporciona el objeto transaccional txn en withTransactionAsync y withExclusiveTransactionAsync', async () => {
+    const valTxn = await driver.withTransactionAsync(async (txn) => {
+      expect(txn).toBeDefined();
+      const res = await txn.runAsync('INSERT INTO txn_test VALUES (?)', 1);
+      expect(res.lastInsertRowId).toBe(1);
+      return 'txn_done';
     });
-    expect(calledRegular).toBe(true);
+    expect(valTxn).toBe('txn_done');
+    expect(mockDb.runAsync).toHaveBeenCalledWith('INSERT INTO txn_test VALUES (?)', 1);
 
-    let calledExclusive = false;
-    await driver.withExclusiveTransactionAsync(async () => {
-      calledExclusive = true;
+    const valExclusive = await driver.withExclusiveTransactionAsync(async (txn) => {
+      expect(txn).toBeDefined();
+      const row = await txn.getFirstAsync('SELECT 1');
+      expect(row).toEqual({ id: 'test-1' });
+      return 'exclusive_done';
     });
-    expect(calledExclusive).toBe(true);
+    expect(valExclusive).toBe('exclusive_done');
+    expect(mockDb.execAsync).toHaveBeenCalledWith('BEGIN IMMEDIATE;');
+    expect(mockDb.execAsync).toHaveBeenCalledWith('COMMIT;');
   });
 
   it('delega closeAsync', async () => {
