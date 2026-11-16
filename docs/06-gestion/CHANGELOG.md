@@ -6,6 +6,38 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [0.1.5] - 2026-11-15 (Hito H06.5 — Cierre de Idempotencia y Preparación de Despliegue Supabase)
+
+### Añadido
+- **Pruebas de Concurrencia Multi-Conexión Real en PostgreSQL (`packages/sync-engine/tests/postgres-concurrency.test.ts`):**
+  - Validación con 2 conexiones TCP independientes concurrentes hacia un servidor PostgreSQL 16 aislado en puerto local 5433:
+    1. Dos solicitudes paralelas idénticas: serialización a nivel de índice atómico, una sola aplicación física en `sync_test_records`, una respuesta `processed` y una respuesta `already_applied`.
+    2. Dos solicitudes paralelas con misma clave y distinto `payload`: una aplicación física exitosa y rechazo inmediato de la colisión (`status: 'rejected'`).
+- **Nuevas Pruebas en Suite PostgreSQL (`packages/sync-engine/tests/postgres-sync.test.ts`):**
+  - Detección y rechazo de reutilización de clave con distinto `payload` (`status: 'rejected'`, `success: false`).
+  - Rollback completo y reversión de la reserva de idempotencia ante fallos en la operación de dominio (cero huérfanos).
+  - Rechazo de mutaciones financieras aún no implementadas (`ventas`, `pagos_venta`, `movimientos_caja`).
+- **Protocolo de Despliegue Controlado en Supabase (`docs/04-seguridad/HARDENING.md` §2.10):**
+  - Especificación formal de pre-requisitos, procedimiento de aplicación y pruebas de verificación post-despliegue en producción sin tocar datos reales.
+
+### Corregido
+- **Reserva Atómica Previa a Efectos de Dominio (`supabase/migrations/20261115000001_sync_infrastructure.sql`):**
+  - Inserción previa de la clave de idempotencia con estado `'processing'` antes de mutar cualquier tabla de negocio.
+  - Las solicitudes concurrentes se serializan automáticamente en el índice único de PostgreSQL, eliminando cualquier ventana de doble ejecución de efectos de dominio.
+  - Comparación completa de parámetros y contenido (`payload IS DISTINCT FROM v_payload`): rechazo si el payload difiere.
+  - Bloque transaccional/subtransaccional (`BEGIN ... EXCEPTION`): ante cualquier fallo de dominio, la reserva de idempotencia se revierte automáticamente, garantizando que ninguna mutación quede marcada como procesada sin efectos confirmados.
+  - Actualización a `'processed'` únicamente tras verificar que las filas afectadas en la tabla de dominio son mayores a cero (`ROW_COUNT > 0`).
+
+### Verificado
+- **67 Pruebas Automatizadas Aprobadas en el Monorepo (100% PASS):**
+  - 14 en `@tienda/business-logic`
+  - 19 en `@tienda/database`
+  - 34 en `@tienda/sync-engine` (12 en PGlite, 2 de concurrencia multi-conexión TCP en PostgreSQL real, 20 unitarias/simuladas)
+- **Comprobación de Tipos TypeScript (`pnpm typecheck`):** 9/9 tareas exitosas sin errores.
+- **Aislamiento de Producción:** Cero despliegues ejecutados en el proyecto remoto `hixrwpiyyhrifsxgekfe`; base remota intacta.
+
+---
+
 ## [0.1.4] - 2026-11-15 (Hito H06.4 — Auditoría Final de Seguridad y Validación PostgreSQL)
 
 ### Añadido

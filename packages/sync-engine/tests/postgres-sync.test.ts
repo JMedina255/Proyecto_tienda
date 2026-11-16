@@ -403,7 +403,19 @@ describe('PostgreSQL Real Migration & Security Audit (PGlite)', () => {
     expect(res2.rows[0].sync_push_mutations.results[0].status).toBe('already_applied');
     expect(res2.rows[0].sync_push_mutations.results[0].success).toBe(true);
 
-    // 3er intento: MISMA clave pero OTRO entityId (intento de reutilización/colisión)
+    // 3er intento: MISMA clave pero DISTINTO payload (debe rechazarse)
+    const alteredPayloadMutation = {
+      ...mutation,
+      payload: { value: 999 },
+    };
+    const resPayload = await db.query<{ sync_push_mutations: any }>(`SELECT public.sync_push_mutations($1::jsonb);`, [
+      JSON.stringify({ mutations: [alteredPayloadMutation] }),
+    ]);
+    expect(resPayload.rows[0].sync_push_mutations.results[0].status).toBe('rejected');
+    expect(resPayload.rows[0].sync_push_mutations.results[0].success).toBe(false);
+    expect(resPayload.rows[0].sync_push_mutations.results[0].error).toMatch(/Clave de idempotencia reutilizada con parámetros o contenido diferentes/);
+
+    // 4to intento: MISMA clave pero OTRO entityId (intento de reutilización/colisión)
     const alteredMutation = {
       ...mutation,
       entityId: 'otro-rec-distinto',
@@ -413,19 +425,82 @@ describe('PostgreSQL Real Migration & Security Audit (PGlite)', () => {
     ]);
     expect(res3.rows[0].sync_push_mutations.results[0].status).toBe('rejected');
     expect(res3.rows[0].sync_push_mutations.results[0].success).toBe(false);
-    expect(res3.rows[0].sync_push_mutations.results[0].error).toMatch(/Clave de idempotencia reutilizada con parámetros diferentes/);
+    expect(res3.rows[0].sync_push_mutations.results[0].error).toMatch(/Clave de idempotencia reutilizada con parámetros o contenido diferentes/);
 
-    // 4to intento: MISMA clave pero OTRO usuario
+    // 5to intento: MISMA clave pero OTRO usuario
     await setAuthContext(USER_B_ID, 'vendedor');
     const res4 = await db.query<{ sync_push_mutations: any }>(`SELECT public.sync_push_mutations($1::jsonb);`, [
       JSON.stringify({ mutations: [mutation] }),
     ]);
     expect(res4.rows[0].sync_push_mutations.results[0].status).toBe('rejected');
     expect(res4.rows[0].sync_push_mutations.results[0].success).toBe(false);
-    expect(res4.rows[0].sync_push_mutations.results[0].error).toMatch(/Clave de idempotencia reutilizada con parámetros diferentes/);
+    expect(res4.rows[0].sync_push_mutations.results[0].error).toMatch(/Clave de idempotencia reutilizada con parámetros o contenido diferentes/);
   });
 
-  it('10. La función opera con search_path = "" y referencias de esquema explícitas', async () => {
+  it('10. Rechaza mutaciones financieras aún no implementadas (hoja de ruta H07+)', async () => {
+    await setAuthContext(USER_A_ID, 'vendedor');
+
+    const res = await db.query<{ sync_push_mutations: any }>(`SELECT public.sync_push_mutations($1::jsonb);`, [
+      JSON.stringify({
+        mutations: [
+          {
+            idempotencyKey: 'b'.repeat(64),
+            entityType: 'ventas',
+            entityId: 'vta-001',
+            operation: 'INSERT',
+            payload: { total: 5000 },
+            createdAt: new Date().toISOString(),
+          },
+          {
+            idempotencyKey: 'c'.repeat(64),
+            entityType: 'movimientos_caja',
+            entityId: 'caja-001',
+            operation: 'INSERT',
+            payload: { monto: 1000 },
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      }),
+    ]);
+
+    const results = res.rows[0].sync_push_mutations.results;
+    expect(results[0].status).toBe('rejected');
+    expect(results[0].error).toMatch(/Entidad aún no implementada en el backend \(prevista para H07\+\): ventas/);
+    expect(results[1].status).toBe('rejected');
+    expect(results[1].error).toMatch(/Entidad aún no implementada en el backend \(prevista para H07\+\): movimientos_caja/);
+  });
+
+  it('11. Fallo después de reservar idempotencia: rollback completo (la clave no queda registrada como procesada)', async () => {
+    await setAuthContext(USER_A_ID, 'vendedor');
+
+    const failKey = 'd'.repeat(64);
+    // Intento de UPDATE sobre un registro inexistente -> falla con 0 filas afectadas
+    const res = await db.query<{ sync_push_mutations: any }>(`SELECT public.sync_push_mutations($1::jsonb);`, [
+      JSON.stringify({
+        mutations: [
+          {
+            idempotencyKey: failKey,
+            entityType: 'sync_test',
+            entityId: 'rec-inexistente',
+            operation: 'UPDATE',
+            payload: { foo: 'bar' },
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      }),
+    ]);
+
+    expect(res.rows[0].sync_push_mutations.results[0].status).toBe('rejected');
+
+    // Comprobar que en sync_processed_mutations NO queda ninguna fila con failKey
+    const checkAudit = await db.query(
+      `SELECT * FROM public.sync_processed_mutations WHERE idempotency_key = $1;`,
+      [failKey],
+    );
+    expect(checkAudit.rows.length).toBe(0);
+  });
+
+  it('12. La función opera con search_path = "" y referencias de esquema explícitas', async () => {
     // Comprobar que en pg_proc la función tiene proconfig con search_path = ''
     const procRes = await db.query<{ proconfig: string[] }>(`
       SELECT proconfig FROM pg_proc WHERE proname = 'sync_push_mutations';

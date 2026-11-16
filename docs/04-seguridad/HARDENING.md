@@ -97,14 +97,31 @@ Para garantizar máxima trazabilidad técnica y rigor de auditoría, cada contro
 ### 2.8 Seguridad del Motor de Sincronización (SEC-SYNC)
 - **SEC-SYNC-001 (Validación estricta de mutaciones en el servidor):**
   - Supabase valida la autenticidad, pertenencia de rol y congruencia lógica de cada mutación recibida desde la cola outbox móvil antes de aceptarla en la base de datos central.
-- **SEC-SYNC-002 (Prevención de ataques de repetición e idempotencia):**
-  - Toda mutación financiera incluye una clave de idempotencia `idempotency_key` (hash SHA-256 compuesto). El servidor descarta de forma segura reintentos de red ya procesados sin duplicar cobros ni asientos.
+- **SEC-SYNC-002 (Prevención de ataques de repetición e idempotencia atómica):**
+  - Toda mutación financiera incluye una clave de idempotencia `idempotency_key` (hash SHA-256 compuesto).
+  - Reserva atómica previa mediante `INSERT ... ON CONFLICT (idempotency_key) DO NOTHING` con status `processing` antes de ejecutar efectos de dominio.
+  - Validación estricta y comparación de `usuario_id`, `entity_type`, `entity_id`, `operation` y `payload` original.
+  - Si una clave se reutiliza con parámetros o payload distintos, se rechaza de inmediato (`status: 'rejected'`).
+  - Serialización de solicitudes concurrentes a nivel de índice atómico en PostgreSQL sin duplicar efectos.
 - **SEC-SYNC-003 (Mínimo privilegio y seguridad en funciones RPC de Supabase):**
-  - Las funciones RPC en PostgreSQL deben priorizar `SECURITY INVOKER`. Si requieren `SECURITY DEFINER` para registrar en `sync_processed_mutations` o `auditoria_financiera`, deben fijar obligatoriamente `SET search_path = public, pg_temp;`, verificar `auth.uid() IS NOT NULL`, validar roles y revocar privilegios de ejecución a `PUBLIC`.
+  - Las funciones RPC con `SECURITY DEFINER` fijan obligatoriamente `SET search_path = ''` e identificadores cualificados explícitamente (`pg_catalog.`, `public.`, `auth.`), verifican `auth.uid() IS NOT NULL`, aplican RBAC estricto y revocan privilegios de ejecución a `PUBLIC` y `anon` (`GRANT EXECUTE TO authenticated, service_role`).
 
 ### 2.9 Validación y Sanitización de Entradas (SEC-INP)
 - **SEC-INP-001 (Validación con esquemas Zod y sanitización):**
   - Todas las entradas de datos en cliente y servidor deben validarse mediante esquemas tipados Zod, aplicando límites de longitud, formatos de texto y rangos numéricos para prevenir inyecciones SQL, desbordes y caracteres anómalos.
+
+### 2.10 Protocolo Controlado de Despliegue en Supabase (Procedimiento Pre-producción)
+Para cuando se autorice formalmente el despliegue de migraciones hacia el proyecto remoto `hixrwpiyyhrifsxgekfe`:
+1. **Pre-requisitos Mandatorios:**
+   - Confirmación escrita y expresa del usuario/responsable del proyecto.
+   - Ejecución limpia de la suite automatizada de pruebas locales (`pnpm test` con 100% PASS, incluyendo pruebas de integración PostgreSQL real).
+   - Verificación de secreto cero (`git diff` sin claves ni tokens).
+2. **Procedimiento de Despliegue:**
+   - Aplicar migración declarativa versionada `supabase/migrations/20261115000001_sync_infrastructure.sql` mediante `supabase db push` o canal oficial de migraciones.
+3. **Verificación Post-Despliegue:**
+   - Comprobar activación de RLS obligatorio: `SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public' AND tablename IN ('sync_processed_mutations', 'sync_test_records');` (debe retornar `rowsecurity = true`).
+   - Comprobar aislamiento de search_path: `SELECT proname, proconfig FROM pg_proc WHERE proname = 'sync_push_mutations';` (debe contener `search_path=""`).
+   - Comprobar revocación de anon: intentar invocar la función con `anon_key` sin token GoTrue esperando denegación `401 / permission denied`.
 
 ---
 
@@ -131,6 +148,6 @@ Para garantizar máxima trazabilidad técnica y rigor de auditoría, cada contro
 | `SEC-AUD-001` | Inmutabilidad de ledgers financieros (modelo append-only) | Alteración o borrado de transacciones de venta o pagos | Pruebas de ejecución de sentencias `UPDATE`/`DELETE` rechazadas por BD | **Pendiente** |
 | `SEC-AUD-002` | Bitácora forense de autorizaciones y anulaciones | Falta de trazabilidad ante discrepancias de dinero o mercadería | Comprobación de inserción en `auditoria_financiera` ante cada evento | **Pendiente** |
 | `SEC-SYNC-001` | Validación de permisos y congruencia en mutaciones outbox | Inyección de mutaciones manipuladas desde terminales comprometidos | Pruebas de envío de mutaciones falsificadas esperando rechazo 403/422 | **Pendiente** |
-| `SEC-SYNC-002` | Deduplicación e idempotencia por hash SHA-256 | Duplicación accidental de cobros o asientos por reintentos de red | Prueba de envío repetido del mismo `idempotency_key` con respuesta idempotente | **Verificado** |
-| `SEC-SYNC-003` | Seguridad estricta en RPCs (`search_path`, roles, no PUBLIC) | Inyección SQL o escalación de privilegios en funciones Postgres | Auditoría de DDL de funciones RPC y revocación de permisos a `PUBLIC` | **Pendiente** |
+| `SEC-SYNC-002` | Deduplicación e idempotencia atómica (reserva previa y payload) | Duplicación accidental o carreras concurrentes en cobros/asientos | Pruebas de concurrencia multi-conexión y reintentos idénticos | **Verificado** |
+| `SEC-SYNC-003` | Seguridad estricta en RPCs (`search_path = ''`, roles, no PUBLIC/anon) | Inyección SQL o escalación de privilegios en funciones Postgres | Auditoría de DDL, aislamiento de search_path y revocación a anon | **Verificado** |
 | `SEC-INP-001` | Validación estricta con esquemas Zod en todas las entradas | Inyección SQL, datos malformados o inconsistencia de tipos | Pruebas unitarias de validación con inputs maliciosos o truncados | **Implementado** |
