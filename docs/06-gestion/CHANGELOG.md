@@ -22,7 +22,7 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
   - Rechazo de mutaciones financieras aún no implementadas (`ventas`, `pagos_venta`, `movimientos_caja`).
   - Prueba 13: Excepción SQL en runtime provocada por restricción CHECK en tabla de dominio; verificación de reversión atómica de la reserva `processing` (cero registros huérfanos).
 - **Protocolo de Despliegue Controlado en Supabase (`docs/04-seguridad/HARDENING.md` §2.10):**
-  - Especificación formal de pre-requisitos, inventario de 9 objetos de base de datos a desplegar, procedimiento dry-run (`npx supabase db push --dry-run --remote`) y 5 consultas SQL de verificación post-despliegue en producción sin tocar datos reales.
+  - Especificación formal de pre-requisitos, inventario exacto de objetos de base de datos a desplegar (2 tablas con RLS forzado, 4 índices, 6 políticas RLS, 1 función RPC SECURITY DEFINER y privilegios), procedimiento dry-run (`npx supabase db push --dry-run --remote`) y 5 consultas SQL de verificación post-despliegue utilizando `pg_catalog.pg_class.relforcerowsecurity`.
 
 ### Corregido
 - **Reserva Atómica Previa y Reversión ante Excepciones (`supabase/migrations/20261115000001_sync_infrastructure.sql`):**

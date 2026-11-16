@@ -123,17 +123,26 @@ Para cuando se autorice formalmente el despliegue de migraciones hacia el proyec
 3. **Objetos que se Crearán en la Base de Datos:**
    - `public.sync_processed_mutations`: Tabla de auditoría e idempotencia con constraint `status IN ('processed', 'failed', 'already_applied', 'rejected', 'processing')`. RLS activado y forzado (`FORCE ROW LEVEL SECURITY`).
    - `public.sync_test_records`: Tabla de persistencia para pruebas de integración con RLS activado y forzado.
-   - Índices: `idx_sync_processed_idempotency_key` (UNIQUE), `idx_sync_processed_usuario_status`, `idx_sync_test_created_by`, `idx_sync_test_client_id`.
-   - Políticas RLS:
-     - `sync_processed_mutations_select_own` (SELECT para creador o admin/dueño).
-     - `sync_test_records_select_own`, `sync_test_records_insert_auth`, `sync_test_records_update_own`, `sync_test_records_delete_own`.
+   - Índices en `public.sync_processed_mutations`:
+     - `idx_sync_processed_idempotency` (`UNIQUE (idempotency_key)`).
+     - `idx_sync_processed_device_time` (`(dispositivo_id, server_timestamp)`).
+     - `idx_sync_processed_entity` (`(entity_type, entity_id)`).
+     - `idx_sync_processed_user` (`(usuario_id)`).
+   - Políticas RLS (6 políticas):
+     - En `public.sync_processed_mutations`: `sync_processed_select_policy` (SELECT para creador o admin/dueño), `no_direct_client_insert` (bloqueo REST), `no_direct_client_update` (bloqueo REST), `no_direct_client_delete` (bloqueo REST).
+     - En `public.sync_test_records`: `sync_test_records_select_policy` (SELECT para creador o admin/dueño), `sync_test_records_direct_block` (bloqueo REST para ALL).
    - Función RPC: `public.sync_push_mutations(p_batch pg_catalog.jsonb)` (SECURITY DEFINER, `SET search_path = ''`, revocada a `PUBLIC` y `anon`, concedida exclusivamente a `authenticated` y `service_role`).
 4. **Consultas de Verificación Posterior (Post-Despliegue):**
    ```sql
-   -- 1. Verificar existencia de tablas y RLS activado y forzado
-   SELECT schemaname, tablename, rowsecurity, forcerowsecurity
-   FROM pg_tables
-   WHERE schemaname = 'public' AND tablename IN ('sync_processed_mutations', 'sync_test_records');
+   -- 1. Verificar existencia de tablas, RLS habilitado (relrowsecurity) y forzado (relforcerowsecurity)
+   SELECT
+       c.relname AS tablename,
+       c.relrowsecurity AS rls_enabled,
+       c.relforcerowsecurity AS rls_forced
+   FROM pg_catalog.pg_class c
+   JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+   WHERE n.nspname = 'public'
+     AND c.relname IN ('sync_processed_mutations', 'sync_test_records');
 
    -- 2. Verificar índices requeridos
    SELECT tablename, indexname
