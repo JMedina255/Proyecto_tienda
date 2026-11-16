@@ -13,28 +13,38 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
   - Validación con 2 conexiones TCP independientes concurrentes hacia un servidor PostgreSQL 16 aislado en puerto local 5433:
     1. Dos solicitudes paralelas idénticas: serialización a nivel de índice atómico, una sola aplicación física en `sync_test_records`, una respuesta `processed` y una respuesta `already_applied`.
     2. Dos solicitudes paralelas con misma clave y distinto `payload`: una aplicación física exitosa y rechazo inmediato de la colisión (`status: 'rejected'`).
+    3. Excepción SQL real en dominio (restricción CHECK): reversión inmediata de la reserva `processing`, verificación de cero registros huérfanos y respuesta `failed`.
+  - Semántica estricta de omisión (`ctx.skip()`): no contabiliza como PASS pruebas en ausencia de servidor local PostgreSQL en 5433.
+  - Validación de seguridad de entorno: fallo inmediato si se intenta ejecutar contra un host distinto a `127.0.0.1`/`localhost` o un puerto distinto a `5433`.
 - **Nuevas Pruebas en Suite PostgreSQL (`packages/sync-engine/tests/postgres-sync.test.ts`):**
   - Detección y rechazo de reutilización de clave con distinto `payload` (`status: 'rejected'`, `success: false`).
   - Rollback completo y reversión de la reserva de idempotencia ante fallos en la operación de dominio (cero huérfanos).
   - Rechazo de mutaciones financieras aún no implementadas (`ventas`, `pagos_venta`, `movimientos_caja`).
+  - Prueba 13: Excepción SQL en runtime provocada por restricción CHECK en tabla de dominio; verificación de reversión atómica de la reserva `processing` (cero registros huérfanos).
 - **Protocolo de Despliegue Controlado en Supabase (`docs/04-seguridad/HARDENING.md` §2.10):**
-  - Especificación formal de pre-requisitos, procedimiento de aplicación y pruebas de verificación post-despliegue en producción sin tocar datos reales.
+  - Especificación formal de pre-requisitos, inventario de 9 objetos de base de datos a desplegar, procedimiento dry-run (`npx supabase db push --dry-run --remote`) y 5 consultas SQL de verificación post-despliegue en producción sin tocar datos reales.
 
 ### Corregido
-- **Reserva Atómica Previa a Efectos de Dominio (`supabase/migrations/20261115000001_sync_infrastructure.sql`):**
-  - Inserción previa de la clave de idempotencia con estado `'processing'` antes de mutar cualquier tabla de negocio.
-  - Las solicitudes concurrentes se serializan automáticamente en el índice único de PostgreSQL, eliminando cualquier ventana de doble ejecución de efectos de dominio.
+- **Reserva Atómica Previa y Reversión ante Excepciones (`supabase/migrations/20261115000001_sync_infrastructure.sql`):**
+  - Inserción previa de la clave de idempotencia con estado `'processing'` dentro de un bloque `BEGIN ... EXCEPTION ... END` por mutación.
+  - Ante cualquier excepción SQL o fallo de persistencia, PostgreSQL revierte automáticamente la subtransacción, y el bloque `EXCEPTION` ejecuta `DELETE FROM public.sync_processed_mutations WHERE id = v_inserted_id;` como defensa en profundidad, garantizando que jamás quede un registro huérfano con estado `processing`.
   - Comparación completa de parámetros y contenido (`payload IS DISTINCT FROM v_payload`): rechazo si el payload difiere.
-  - Bloque transaccional/subtransaccional (`BEGIN ... EXCEPTION`): ante cualquier fallo de dominio, la reserva de idempotencia se revierte automáticamente, garantizando que ninguna mutación quede marcada como procesada sin efectos confirmados.
+  - Comprobación estricta de estado previo: únicamente estados `'processed'` o `'already_applied'` pueden retornar `already_applied`; cualquier mutación previa con estado `'processing'`, `'failed'` o `'rejected'` se rechaza explícitamente.
   - Actualización a `'processed'` únicamente tras verificar que las filas afectadas en la tabla de dominio son mayores a cero (`ROW_COUNT > 0`).
 
 ### Verificado
-- **67 Pruebas Automatizadas Aprobadas en el Monorepo (100% PASS):**
+- **Pruebas Automatizadas Aprobadas (100% PASS):**
   - 14 en `@tienda/business-logic`
   - 19 en `@tienda/database`
-  - 34 en `@tienda/sync-engine` (12 en PGlite, 2 de concurrencia multi-conexión TCP en PostgreSQL real, 20 unitarias/simuladas)
+  - 36 en `@tienda/sync-engine` con PostgreSQL TCP 5433 activo (13 en PGlite, 3 de concurrencia multi-conexión TCP en PostgreSQL real, 20 unitarias/simuladas). Total: **69 pruebas ejecutadas y aprobadas**.
+  - En ausencia de PostgreSQL TCP local: 66 pruebas ejecutadas y aprobadas, 3 pruebas omitidas explícitamente (`skipped`), 0 pendientes.
 - **Comprobación de Tipos TypeScript (`pnpm typecheck`):** 9/9 tareas exitosas sin errores.
-- **Aislamiento de Producción:** Cero despliegues ejecutados en el proyecto remoto `hixrwpiyyhrifsxgekfe`; base remota intacta.
+- **Auditoría Supabase CLI y Base Remota:**
+  - Versión Supabase CLI: 3.1.0 (`npx supabase --version`).
+  - Proyecto vinculado verificado: `hixrwpiyyhrifsxgekfe` (`supabase/config.toml` y `supabase/.temp/project-ref`).
+  - Migraciones remotas existentes: 0 migraciones (`supabase_mcp.list_migrations`).
+  - Tablas públicas remotas existentes: 0 tablas (`supabase_mcp.list_tables`).
+  - Cero escrituras ejecutadas en producción; base remota preservada intacta.
 
 ---
 

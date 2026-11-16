@@ -114,14 +114,47 @@ Para garantizar máxima trazabilidad técnica y rigor de auditoría, cada contro
 Para cuando se autorice formalmente el despliegue de migraciones hacia el proyecto remoto `hixrwpiyyhrifsxgekfe`:
 1. **Pre-requisitos Mandatorios:**
    - Confirmación escrita y expresa del usuario/responsable del proyecto.
-   - Ejecución limpia de la suite automatizada de pruebas locales (`pnpm test` con 100% PASS, incluyendo pruebas de integración PostgreSQL real).
+   - Ejecución limpia de la suite automatizada de pruebas locales (`pnpm test` con 100% PASS, incluyendo pruebas de integración PostgreSQL real y PGlite).
    - Verificación de secreto cero (`git diff` sin claves ni tokens).
-2. **Procedimiento de Despliegue:**
-   - Aplicar migración declarativa versionada `supabase/migrations/20261115000001_sync_infrastructure.sql` mediante `supabase db push` o canal oficial de migraciones.
-3. **Verificación Post-Despliegue:**
-   - Comprobar activación de RLS obligatorio: `SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public' AND tablename IN ('sync_processed_mutations', 'sync_test_records');` (debe retornar `rowsecurity = true`).
-   - Comprobar aislamiento de search_path: `SELECT proname, proconfig FROM pg_proc WHERE proname = 'sync_push_mutations';` (debe contener `search_path=""`).
-   - Comprobar revocación de anon: intentar invocar la función con `anon_key` sin token GoTrue esperando denegación `401 / permission denied`.
+   - Verificación de versión de Supabase CLI (`npx supabase --version >= 3.1.0`) y vinculación explícita con el proyecto (`hixrwpiyyhrifsxgekfe`).
+2. **Procedimiento de Despliegue Controlado:**
+   - Inspección previa (Dry-Run): `npx supabase db push --dry-run --remote`.
+   - Aplicar migración declarativa versionada `supabase/migrations/20261115000001_sync_infrastructure.sql` únicamente tras autorización expresa: `npx supabase db push --remote`.
+3. **Objetos que se Crearán en la Base de Datos:**
+   - `public.sync_processed_mutations`: Tabla de auditoría e idempotencia con constraint `status IN ('processed', 'failed', 'already_applied', 'rejected', 'processing')`. RLS activado y forzado (`FORCE ROW LEVEL SECURITY`).
+   - `public.sync_test_records`: Tabla de persistencia para pruebas de integración con RLS activado y forzado.
+   - Índices: `idx_sync_processed_idempotency_key` (UNIQUE), `idx_sync_processed_usuario_status`, `idx_sync_test_created_by`, `idx_sync_test_client_id`.
+   - Políticas RLS:
+     - `sync_processed_mutations_select_own` (SELECT para creador o admin/dueño).
+     - `sync_test_records_select_own`, `sync_test_records_insert_auth`, `sync_test_records_update_own`, `sync_test_records_delete_own`.
+   - Función RPC: `public.sync_push_mutations(p_batch pg_catalog.jsonb)` (SECURITY DEFINER, `SET search_path = ''`, revocada a `PUBLIC` y `anon`, concedida exclusivamente a `authenticated` y `service_role`).
+4. **Consultas de Verificación Posterior (Post-Despliegue):**
+   ```sql
+   -- 1. Verificar existencia de tablas y RLS activado y forzado
+   SELECT schemaname, tablename, rowsecurity, forcerowsecurity
+   FROM pg_tables
+   WHERE schemaname = 'public' AND tablename IN ('sync_processed_mutations', 'sync_test_records');
+
+   -- 2. Verificar índices requeridos
+   SELECT tablename, indexname
+   FROM pg_indexes
+   WHERE schemaname = 'public' AND tablename IN ('sync_processed_mutations', 'sync_test_records');
+
+   -- 3. Verificar políticas RLS registradas
+   SELECT tablename, policyname, permissive, roles, cmd, qual
+   FROM pg_policies
+   WHERE schemaname = 'public' AND tablename IN ('sync_processed_mutations', 'sync_test_records');
+
+   -- 4. Verificar configuración de search_path de la RPC
+   SELECT proname, prosecdef, proconfig
+   FROM pg_proc
+   WHERE proname = 'sync_push_mutations';
+
+   -- 5. Verificar revocación de privilegios hacia PUBLIC y anon
+   SELECT routine_schema, routine_name, grantee, privilege_type
+   FROM information_schema.routine_privileges
+   WHERE routine_schema = 'public' AND routine_name = 'sync_push_mutations';
+   ```
 
 ---
 

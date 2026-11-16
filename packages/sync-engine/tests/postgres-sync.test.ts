@@ -508,4 +508,66 @@ describe('PostgreSQL Real Migration & Security Audit (PGlite)', () => {
     expect(procRes.rows.length).toBe(1);
     expect(procRes.rows[0].proconfig[0]).toMatch(/search_path=(""|=)/);
   });
+
+  it('13. Excepción SQL real posterior a la reserva: la reserva processing se revierte y no queda huérfana', async () => {
+    // Como superusuario / owner, agregamos una restricción CHECK en sync_test_records para forzar una excepción SQL en runtime
+    await db.query(`RESET ROLE;`);
+    await db.query(`
+      ALTER TABLE public.sync_test_records
+      ADD CONSTRAINT chk_test_crash CHECK ((payload->>'force_sql_crash')::boolean IS NOT TRUE);
+    `);
+
+    await setAuthContext(USER_A_ID, 'vendedor');
+
+    const crashKey = '9'.repeat(64);
+    const crashEntityId = 'rec-crash-pglite-001';
+
+    try {
+      const res = await db.query<{ sync_push_mutations: any }>(`SELECT public.sync_push_mutations($1::jsonb);`, [
+        JSON.stringify({
+          mutations: [
+            {
+              idempotencyKey: crashKey,
+              entityType: 'sync_test',
+              entityId: crashEntityId,
+              operation: 'INSERT',
+              payload: { force_sql_crash: true },
+              createdAt: new Date().toISOString(),
+            },
+          ],
+        }),
+      ]);
+
+      const result = res.rows[0].sync_push_mutations.results[0];
+      // La mutación debe ser reportada como 'failed' por la excepción SQL
+      expect(result.status).toBe('failed');
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/Fallo en persistencia:.*chk_test_crash/);
+
+      // Comprobar que en sync_processed_mutations NO queda NINGÚN registro con esa clave
+      const checkAudit = await db.query(
+        `SELECT * FROM public.sync_processed_mutations WHERE idempotency_key = $1;`,
+        [crashKey],
+      );
+      expect(checkAudit.rows.length).toBe(0);
+
+      // Comprobar que NO queda ningún registro en estado 'processing' en toda la tabla
+      const checkProcessing = await db.query(
+        `SELECT * FROM public.sync_processed_mutations WHERE status = 'processing';`,
+      );
+      expect(checkProcessing.rows.length).toBe(0);
+
+      // Comprobar que no se insertó nada en la tabla de dominio
+      const checkRecord = await db.query(
+        `SELECT * FROM public.sync_test_records WHERE id = $1;`,
+        [crashEntityId],
+      );
+      expect(checkRecord.rows.length).toBe(0);
+    } finally {
+      await db.query(`RESET ROLE;`);
+      await db.query(`
+        ALTER TABLE public.sync_test_records DROP CONSTRAINT IF EXISTS chk_test_crash;
+      `);
+    }
+  });
 });

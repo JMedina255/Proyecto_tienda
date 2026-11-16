@@ -11,6 +11,14 @@ describe('PostgreSQL Real Multi-Connection Concurrency & Atomicity Test (Port 54
     database: 'postgres',
   };
 
+  // Verificación estricta de aislamiento: nunca ejecutar contra hosts compartidos o puertos estándar de producción
+  if (PG_CONFIG.host !== '127.0.0.1' && PG_CONFIG.host !== 'localhost') {
+    throw new Error('Seguridad: Las pruebas destructivas de concurrencia SOLO pueden ejecutarse contra 127.0.0.1 o localhost.');
+  }
+  if (PG_CONFIG.port !== 5433) {
+    throw new Error('Seguridad: Las pruebas destructivas deben usar el puerto local aislado 5433.');
+  }
+
   const USER_A_ID = '11111111-1111-4111-8111-111111111111';
   let adminClient: Client;
   let isPgAvailable = false;
@@ -84,9 +92,9 @@ describe('PostgreSQL Real Multi-Connection Concurrency & Atomicity Test (Port 54
     }
   });
 
-  it('Dos conexiones independientes concurrentes sobre la misma clave: una sola aplicación física y resultado consistente', async () => {
+  it('Dos conexiones independientes concurrentes sobre la misma clave: una sola aplicación física y resultado consistente', async (ctx) => {
     if (!isPgAvailable) {
-      console.warn('Saltando prueba de concurrencia real: servidor PostgreSQL no accesible.');
+      ctx.skip();
       return;
     }
 
@@ -174,8 +182,11 @@ describe('PostgreSQL Real Multi-Connection Concurrency & Atomicity Test (Port 54
     }
   });
 
-  it('Dos conexiones concurrentes con misma clave pero distinto payload: una procesa y la otra se rechaza', async () => {
-    if (!isPgAvailable) return;
+  it('Dos conexiones concurrentes con misma clave pero distinto payload: una procesa y la otra se rechaza', async (ctx) => {
+    if (!isPgAvailable) {
+      ctx.skip();
+      return;
+    }
 
     const client1 = new Client(PG_CONFIG);
     const client2 = new Client(PG_CONFIG);
@@ -253,6 +264,82 @@ describe('PostgreSQL Real Multi-Connection Concurrency & Atomicity Test (Port 54
     } finally {
       await client1.end();
       await client2.end();
+    }
+  });
+
+  it('Excepción SQL en PostgreSQL TCP: la reserva transitoria processing se revierte y no queda huérfana', async (ctx) => {
+    if (!isPgAvailable) {
+      ctx.skip();
+      return;
+    }
+
+    const client = new Client(PG_CONFIG);
+    await client.connect();
+
+    try {
+      const claims = JSON.stringify({
+        sub: USER_A_ID,
+        role: 'authenticated',
+        app_metadata: { role: 'vendedor' },
+      });
+
+      await client.query(`
+        SELECT set_config('request.jwt.claim.sub', '${USER_A_ID}', false);
+        SELECT set_config('request.jwt.claims', '${claims}', false);
+        SET ROLE authenticated;
+      `);
+
+      // Crear restricción CHECK que fuerce fallo SQL en dominio
+      await adminClient.query(`
+        ALTER TABLE public.sync_test_records
+        ADD CONSTRAINT chk_tcp_crash CHECK ((payload->>'force_tcp_crash')::boolean IS NOT TRUE);
+      `);
+
+      const key = '9'.repeat(64);
+      const entityId = 'tcp-crash-rec-001';
+
+      const batch = {
+        dispositivoId: 'disp-concurrency-tcp',
+        appVersion: '0.1.0',
+        mutations: [
+          {
+            idempotencyKey: key,
+            entityType: 'sync_test',
+            entityId,
+            operation: 'INSERT',
+            payload: { force_tcp_crash: true },
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      };
+
+      const res = await client.query<{ sync_push_mutations: any }>(
+        `SELECT public.sync_push_mutations($1::jsonb);`,
+        [JSON.stringify(batch)],
+      );
+
+      const result = res.rows[0].sync_push_mutations.results[0];
+      expect(result.status).toBe('failed');
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/Fallo en persistencia:.*chk_tcp_crash/);
+
+      // Comprobar que en sync_processed_mutations NO queda ningún registro para esa clave
+      const checkAudit = await adminClient.query(
+        `SELECT * FROM public.sync_processed_mutations WHERE idempotency_key = $1;`,
+        [key],
+      );
+      expect(checkAudit.rows.length).toBe(0);
+
+      // Comprobar que en TODA la tabla sync_processed_mutations NO existe ningún registro con status 'processing'
+      const checkProcessing = await adminClient.query(
+        `SELECT * FROM public.sync_processed_mutations WHERE status = 'processing';`,
+      );
+      expect(checkProcessing.rows.length).toBe(0);
+    } finally {
+      await adminClient.query(`
+        ALTER TABLE public.sync_test_records DROP CONSTRAINT IF EXISTS chk_tcp_crash;
+      `);
+      await client.end();
     }
   });
 });

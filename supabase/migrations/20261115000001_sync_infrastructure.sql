@@ -189,6 +189,16 @@ BEGIN
     -- 5. Procesamiento secuencial y seguro de cada mutación en el lote
     FOR v_mutation IN SELECT * FROM pg_catalog.jsonb_array_elements(v_mutations)
     LOOP
+        v_inserted_id := NULL;
+        v_existing_user_id := NULL;
+        v_existing_entity_type := NULL;
+        v_existing_entity_id := NULL;
+        v_existing_operation := NULL;
+        v_existing_payload := NULL;
+        v_existing_status := NULL;
+        v_record_creator := NULL;
+        v_rows_affected := 0;
+
         v_idempotency_key := v_mutation ->> 'idempotencyKey';
         v_dispositivo_id := COALESCE(v_mutation ->> 'dispositivoId', v_batch_device_id);
         v_entity_type := v_mutation ->> 'entityType';
@@ -270,85 +280,97 @@ BEGIN
             CONTINUE;
         END IF;
 
-        -- 5.4 Reserva e Idempotencia Atómica PREVIA a efectos de dominio
-        -- Se intenta registrar la clave con status 'processing'.
-        -- Gracias al índice UNIQUE sobre idempotency_key:
-        -- - Si dos peticiones concurrentes intentan registrar la misma clave, la segunda se bloquea
-        --   a nivel de índice hasta que la primera confirme o aborte la transacción.
-        -- - Si la clave ya fue registrada previamente, v_inserted_id será NULL.
-        INSERT INTO public.sync_processed_mutations (
-            idempotency_key,
-            dispositivo_id,
-            usuario_id,
-            entity_type,
-            entity_id,
-            operation,
-            status,
-            payload,
-            client_timestamp
-        ) VALUES (
-            v_idempotency_key,
-            v_dispositivo_id,
-            v_user_id,
-            v_entity_type,
-            v_entity_id,
-            v_operation,
-            'processing',
-            v_payload,
-            v_client_timestamp
-        )
-        ON CONFLICT (idempotency_key) DO NOTHING
-        RETURNING id INTO v_inserted_id;
+        -- 5.4 Bloque atómico por mutación: reserva 'processing', efectos de dominio y confirmación 'processed'
+        -- Al estar enmarcado en un bloque BEGIN ... EXCEPTION ... END:
+        -- 1. Si ocurre cualquier excepción SQL en la reserva o en el dominio, PostgreSQL revierte
+        --    automáticamente la subtransacción completa al savepoint previo a la reserva.
+        -- 2. El bloque EXCEPTION garantiza además la eliminación explícita de v_inserted_id si existiese.
+        -- 3. Jamás queda un registro huérfano con status 'processing'.
+        BEGIN
+            -- Reserva e Idempotencia Atómica PREVIA a efectos de dominio
+            INSERT INTO public.sync_processed_mutations (
+                idempotency_key,
+                dispositivo_id,
+                usuario_id,
+                entity_type,
+                entity_id,
+                operation,
+                status,
+                payload,
+                client_timestamp
+            ) VALUES (
+                v_idempotency_key,
+                v_dispositivo_id,
+                v_user_id,
+                v_entity_type,
+                v_entity_id,
+                v_operation,
+                'processing',
+                v_payload,
+                v_client_timestamp
+            )
+            ON CONFLICT (idempotency_key) DO NOTHING
+            RETURNING id INTO v_inserted_id;
 
-        -- Si no se pudo insertar, la clave ya existe (o fue confirmada por otra transacción)
-        IF v_inserted_id IS NULL THEN
-            SELECT usuario_id, entity_type, entity_id, operation, payload, status
-            INTO v_existing_user_id, v_existing_entity_type, v_existing_entity_id, v_existing_operation, v_existing_payload, v_existing_status
-            FROM public.sync_processed_mutations
-            WHERE idempotency_key = v_idempotency_key;
+            -- Si no se pudo insertar, la clave ya existe (o fue confirmada por otra transacción)
+            IF v_inserted_id IS NULL THEN
+                SELECT usuario_id, entity_type, entity_id, operation, payload, status
+                INTO v_existing_user_id, v_existing_entity_type, v_existing_entity_id, v_existing_operation, v_existing_payload, v_existing_status
+                FROM public.sync_processed_mutations
+                WHERE idempotency_key = v_idempotency_key;
 
-            -- Comparación exhaustiva: usuario, entidad, id, operación Y contenido original (payload)
-            IF v_existing_user_id IS NOT NULL THEN
-                IF v_existing_user_id <> v_user_id
-                   OR v_existing_entity_type <> v_entity_type
-                   OR v_existing_entity_id <> v_entity_id
-                   OR v_existing_operation <> v_operation
-                   OR (v_existing_payload IS DISTINCT FROM v_payload)
-                THEN
-                    v_failed_count := v_failed_count + 1;
-                    v_item_result := pg_catalog.jsonb_build_object(
-                        'idempotencyKey', v_idempotency_key,
-                        'entityType', v_entity_type,
-                        'entityId', v_entity_id,
-                        'status', 'rejected',
-                        'success', false,
-                        'error', 'Clave de idempotencia reutilizada con parámetros o contenido diferentes (usuario, entidad, operación o payload no coinciden)',
-                        'serverTimestamp', pg_catalog.clock_timestamp()
-                    );
-                    v_results := v_results || v_item_result;
-                    CONTINUE;
-                ELSE
-                    -- Mutación previamente procesada de forma idéntica
-                    v_already_applied_count := v_already_applied_count + 1;
-                    v_item_result := pg_catalog.jsonb_build_object(
-                        'idempotencyKey', v_idempotency_key,
-                        'entityType', v_entity_type,
-                        'entityId', v_entity_id,
-                        'status', 'already_applied',
-                        'success', true,
-                        'serverTimestamp', pg_catalog.clock_timestamp()
-                    );
-                    v_results := v_results || v_item_result;
-                    CONTINUE;
+                -- Comparación exhaustiva: usuario, entidad, id, operación Y contenido original (payload)
+                IF v_existing_user_id IS NOT NULL THEN
+                    IF v_existing_user_id <> v_user_id
+                       OR v_existing_entity_type <> v_entity_type
+                       OR v_existing_entity_id <> v_entity_id
+                       OR v_existing_operation <> v_operation
+                       OR (v_existing_payload IS DISTINCT FROM v_payload)
+                    THEN
+                        v_failed_count := v_failed_count + 1;
+                        v_item_result := pg_catalog.jsonb_build_object(
+                            'idempotencyKey', v_idempotency_key,
+                            'entityType', v_entity_type,
+                            'entityId', v_entity_id,
+                            'status', 'rejected',
+                            'success', false,
+                            'error', 'Clave de idempotencia reutilizada con parámetros o contenido diferentes (usuario, entidad, operación o payload no coinciden)',
+                            'serverTimestamp', pg_catalog.clock_timestamp()
+                        );
+                        v_results := v_results || v_item_result;
+                        CONTINUE;
+                    ELSIF v_existing_status IN ('processed', 'already_applied') THEN
+                        -- Mutación previamente procesada de forma idéntica
+                        v_already_applied_count := v_already_applied_count + 1;
+                        v_item_result := pg_catalog.jsonb_build_object(
+                            'idempotencyKey', v_idempotency_key,
+                            'entityType', v_entity_type,
+                            'entityId', v_entity_id,
+                            'status', 'already_applied',
+                            'success', true,
+                            'serverTimestamp', pg_catalog.clock_timestamp()
+                        );
+                        v_results := v_results || v_item_result;
+                        CONTINUE;
+                    ELSE
+                        -- Mutación previa con estado no confirmado ('processing', 'failed', 'rejected')
+                        v_failed_count := v_failed_count + 1;
+                        v_item_result := pg_catalog.jsonb_build_object(
+                            'idempotencyKey', v_idempotency_key,
+                            'entityType', v_entity_type,
+                            'entityId', v_entity_id,
+                            'status', 'rejected',
+                            'success', false,
+                            'error', 'La mutación previa no culminó exitosamente (estado previo: ' || COALESCE(v_existing_status, 'desconocido') || ')',
+                            'serverTimestamp', pg_catalog.clock_timestamp()
+                        );
+                        v_results := v_results || v_item_result;
+                        CONTINUE;
+                    END IF;
                 END IF;
             END IF;
-        END IF;
 
-        -- 5.5 Aplicación de la operación de dominio ('sync_test') con verificación atómica y reversión ante fallos
-        -- Si cualquier verificación o efecto de dominio falla, se revierte/elimina la reserva de idempotencia
-        -- para garantizar que ambas pertenezcan a la misma unidad atómica y no quede una mutación registrada
-        -- sin efectos reales confirmados.
-        BEGIN
+            -- 5.5 Aplicación de la operación de dominio ('sync_test') con verificación atómica y reversión ante fallos
             IF v_operation = 'INSERT' THEN
                 SELECT created_by INTO v_record_creator
                 FROM public.sync_test_records
@@ -529,6 +551,16 @@ BEGIN
             v_results := v_results || v_item_result;
 
         EXCEPTION WHEN OTHERS THEN
+            -- Reversión de seguridad garantizada: si la subtransacción o una excepción SQL
+            -- ocurrió tras la reserva, aseguramos la eliminación de cualquier registro 'processing'
+            IF v_inserted_id IS NOT NULL THEN
+                BEGIN
+                    DELETE FROM public.sync_processed_mutations WHERE id = v_inserted_id;
+                EXCEPTION WHEN OTHERS THEN
+                    NULL;
+                END;
+            END IF;
+
             v_failed_count := v_failed_count + 1;
             v_item_result := pg_catalog.jsonb_build_object(
                 'idempotencyKey', v_idempotency_key,
