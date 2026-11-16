@@ -47,6 +47,8 @@ CREATE TABLE IF NOT EXISTS public.sync_test_records (
 -- 3. Habilitación obligatoria de Row Level Security (RLS)
 ALTER TABLE public.sync_processed_mutations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sync_test_records ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sync_processed_mutations FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.sync_test_records FORCE ROW LEVEL SECURITY;
 
 -- Políticas de lectura en sync_processed_mutations
 DROP POLICY IF EXISTS "sync_processed_select_policy" ON public.sync_processed_mutations;
@@ -55,7 +57,7 @@ CREATE POLICY "sync_processed_select_policy" ON public.sync_processed_mutations
     TO authenticated
     USING (
         auth.uid() = usuario_id
-        OR COALESCE(auth.jwt() -> 'app_metadata' ->> 'role', 'vendedor') IN ('dueno', 'administrador')
+        OR COALESCE((auth.jwt() -> 'app_metadata' ->> 'role'), 'vendedor') IN ('dueno', 'administrador')
     );
 
 -- Bloqueo de escrituras directas por clientes REST (solo la función RPC puede insertar)
@@ -77,13 +79,17 @@ CREATE POLICY "no_direct_client_delete" ON public.sync_processed_mutations
     TO authenticated
     USING (false);
 
--- Políticas en sync_test_records
+-- Políticas en sync_test_records: Restricción estricta de lectura para impedir acceso a datos ajenos
 DROP POLICY IF EXISTS "sync_test_records_select_policy" ON public.sync_test_records;
 CREATE POLICY "sync_test_records_select_policy" ON public.sync_test_records
     FOR SELECT
     TO authenticated
-    USING (true);
+    USING (
+        created_by = auth.uid()
+        OR COALESCE((auth.jwt() -> 'app_metadata' ->> 'role'), 'vendedor') IN ('dueno', 'administrador')
+    );
 
+-- Bloqueo de mutaciones directas por clientes REST (solo la función RPC puede mutar registros)
 DROP POLICY IF EXISTS "sync_test_records_direct_block" ON public.sync_test_records;
 CREATE POLICY "sync_test_records_direct_block" ON public.sync_test_records
     FOR ALL
@@ -93,60 +99,71 @@ CREATE POLICY "sync_test_records_direct_block" ON public.sync_test_records
 
 -- 4. Función RPC transaccional segura para recepción, aplicación y deduplicación de mutaciones
 -- Reglas críticas:
--- - Cero SQL dinámico (no evalúa código arbitrario ni concatena identificadores).
+-- - search_path = '' para inmunidad total frente a secuestro de esquemas (CWE-426).
+-- - Referencias explícitas pg_catalog., public., auth.
 -- - Soporta argumento p_batch como objeto SyncBatchRequest {"dispositivoId", "appVersion", "mutations"} o array.
+-- - Límite de lote estricto (1 a 100 mutaciones).
 -- - La identidad del usuario (usuario_id) se extrae del token GoTrue (auth.uid()), NUNCA del cliente.
 -- - El rol se valida desde auth.jwt() -> 'app_metadata' ->> 'role'.
--- - Aplica realmente la operación de dominio en una sola transacción o rechaza si no está implementada.
+-- - Comprobación de propiedad y permisos antes de mutar registros de dominio.
+-- - Verificación de filas afectadas (ROW_COUNT) en UPDATE y DELETE antes de reportar éxito.
+-- - Idempotencia reforzada: rechaza claves duplicadas reutilizadas con parámetros diferentes.
 -- - Resuelve concurrencia mediante INSERT ON CONFLICT DO NOTHING a nivel de índice atómico.
-CREATE OR REPLACE FUNCTION public.sync_push_mutations(p_batch JSONB)
-RETURNS JSONB
+CREATE OR REPLACE FUNCTION public.sync_push_mutations(p_batch pg_catalog.jsonb)
+RETURNS pg_catalog.jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, pg_temp
+SET search_path = ''
 AS $$
 DECLARE
-    v_user_id UUID;
-    v_user_role TEXT;
-    v_mutations JSONB;
-    v_batch_device_id TEXT := 'desconocido';
-    v_mutation JSONB;
-    v_idempotency_key TEXT;
-    v_dispositivo_id TEXT;
-    v_entity_type TEXT;
-    v_entity_id TEXT;
-    v_operation TEXT;
-    v_payload JSONB;
-    v_client_timestamp TIMESTAMPTZ;
-    v_processed_count INT := 0;
-    v_already_applied_count INT := 0;
-    v_failed_count INT := 0;
-    v_results JSONB := '[]'::JSONB;
-    v_inserted_id UUID;
-    v_item_result JSONB;
+    v_user_id pg_catalog.uuid;
+    v_user_role pg_catalog.text;
+    v_mutations pg_catalog.jsonb;
+    v_batch_length pg_catalog.int4;
+    v_batch_device_id pg_catalog.text := 'desconocido';
+    v_mutation pg_catalog.jsonb;
+    v_idempotency_key pg_catalog.text;
+    v_dispositivo_id pg_catalog.text;
+    v_entity_type pg_catalog.text;
+    v_entity_id pg_catalog.text;
+    v_operation pg_catalog.text;
+    v_payload pg_catalog.jsonb;
+    v_client_timestamp pg_catalog.timestamptz;
+    v_record_creator pg_catalog.uuid;
+    v_rows_affected pg_catalog.int4;
+    v_existing_user_id pg_catalog.uuid;
+    v_existing_entity_type pg_catalog.text;
+    v_existing_entity_id pg_catalog.text;
+    v_existing_operation pg_catalog.text;
+    v_processed_count pg_catalog.int4 := 0;
+    v_already_applied_count pg_catalog.int4 := 0;
+    v_failed_count pg_catalog.int4 := 0;
+    v_results pg_catalog.jsonb := '[]'::pg_catalog.jsonb;
+    v_inserted_id pg_catalog.uuid;
+    v_item_result pg_catalog.jsonb;
 BEGIN
-    -- Verificación mandatoria de sesión autenticada
+    -- 1. Verificación obligatoria de sesión autenticada
     v_user_id := auth.uid();
     IF v_user_id IS NULL THEN
         RAISE EXCEPTION 'No autenticado: se requiere sesión activa de GoTrue'
             USING ERRCODE = '28000';
     END IF;
 
-    -- Obtención segura del rol desde los claims del servidor
+    -- 2. Obtención segura del rol desde los claims del servidor
     v_user_role := COALESCE(auth.jwt() -> 'app_metadata' ->> 'role', 'vendedor');
 
-    -- Validación y normalización del argumento de entrada (objeto SyncBatchRequest o arreglo de mutaciones)
+    -- 3. Validación y normalización del argumento de entrada (objeto SyncBatchRequest o arreglo de mutaciones)
     IF p_batch IS NULL THEN
         RAISE EXCEPTION 'El argumento p_batch no puede ser nulo'
             USING ERRCODE = '22023';
     END IF;
 
-    IF jsonb_typeof(p_batch) = 'array' THEN
+    IF pg_catalog.jsonb_typeof(p_batch) = 'array' THEN
         v_mutations := p_batch;
-    ELSIF jsonb_typeof(p_batch) = 'object' THEN
+    ELSIF pg_catalog.jsonb_typeof(p_batch) = 'object' THEN
         v_batch_device_id := COALESCE(p_batch ->> 'dispositivoId', 'desconocido');
         v_mutations := p_batch -> 'mutations';
-        IF v_mutations IS NULL OR jsonb_typeof(v_mutations) <> 'array' THEN
+        IF v_mutations IS NULL OR pg_catalog.jsonb_typeof(v_mutations) <> 'array' THEN
             RAISE EXCEPTION 'El campo mutations de p_batch debe ser un arreglo JSONB'
                 USING ERRCODE = '22023';
         END IF;
@@ -155,84 +172,297 @@ BEGIN
             USING ERRCODE = '22023';
     END IF;
 
-    -- Procesamiento de cada mutación en el lote
-    FOR v_mutation IN SELECT * FROM jsonb_array_elements(v_mutations)
+    -- 4. Validación de límites del lote (máximo 100 mutaciones por lote, mínimo 1)
+    v_batch_length := pg_catalog.jsonb_array_length(v_mutations);
+    IF v_batch_length = 0 THEN
+        RAISE EXCEPTION 'El lote no contiene mutaciones para procesar'
+            USING ERRCODE = '22023';
+    END IF;
+
+    IF v_batch_length > 100 THEN
+        RAISE EXCEPTION 'El lote excede el límite máximo permitido de 100 mutaciones'
+            USING ERRCODE = '22023';
+    END IF;
+
+    -- 5. Procesamiento secuencial y seguro de cada mutación en el lote
+    FOR v_mutation IN SELECT * FROM pg_catalog.jsonb_array_elements(v_mutations)
     LOOP
         v_idempotency_key := v_mutation ->> 'idempotencyKey';
         v_dispositivo_id := COALESCE(v_mutation ->> 'dispositivoId', v_batch_device_id);
         v_entity_type := v_mutation ->> 'entityType';
         v_entity_id := v_mutation ->> 'entityId';
-        v_operation := v_mutation ->> 'operation';
+        v_operation := pg_catalog.upper(pg_catalog.btrim(COALESCE(v_mutation ->> 'operation', '')));
         v_payload := v_mutation -> 'payload';
-        v_client_timestamp := (v_mutation ->> 'createdAt')::TIMESTAMPTZ;
 
-        -- 1. Validación de campos obligatorios
-        IF v_idempotency_key IS NULL OR length(v_idempotency_key) <> 64
-           OR v_entity_type IS NULL OR v_entity_id IS NULL
-           OR v_operation IS NULL OR v_operation NOT IN ('INSERT', 'UPDATE', 'DELETE')
+        -- Validación de timestamp de cliente seguro
+        BEGIN
+            v_client_timestamp := (v_mutation ->> 'createdAt')::pg_catalog.timestamptz;
+        EXCEPTION WHEN OTHERS THEN
+            v_client_timestamp := NULL;
+        END;
+
+        -- 5.1 Validación estructural de campos obligatorios
+        IF v_idempotency_key IS NULL OR pg_catalog.length(v_idempotency_key) <> 64
+           OR v_entity_type IS NULL OR pg_catalog.length(pg_catalog.btrim(v_entity_type)) = 0
+           OR v_entity_id IS NULL OR pg_catalog.length(pg_catalog.btrim(v_entity_id)) = 0
+           OR v_operation NOT IN ('INSERT', 'UPDATE', 'DELETE')
+           OR v_client_timestamp IS NULL
+           OR (v_operation IN ('INSERT', 'UPDATE') AND (v_payload IS NULL OR pg_catalog.jsonb_typeof(v_payload) <> 'object'))
         THEN
             v_failed_count := v_failed_count + 1;
-            v_item_result := jsonb_build_object(
+            v_item_result := pg_catalog.jsonb_build_object(
                 'idempotencyKey', COALESCE(v_idempotency_key, 'unknown'),
                 'entityType', COALESCE(v_entity_type, 'unknown'),
                 'entityId', COALESCE(v_entity_id, 'unknown'),
                 'status', 'failed',
                 'success', false,
                 'error', 'Parámetros de mutación inválidos o incompletos',
-                'serverTimestamp', clock_timestamp()
+                'serverTimestamp', pg_catalog.clock_timestamp()
             );
             v_results := v_results || v_item_result;
             CONTINUE;
         END IF;
 
-        -- 2. Control de permisos según el rol del usuario autenticado (RBAC)
+        -- 5.2 Control de permisos según el rol del usuario autenticado (RBAC)
         IF v_user_role = 'vendedor' AND v_operation = 'DELETE' THEN
             v_failed_count := v_failed_count + 1;
-            v_item_result := jsonb_build_object(
+            v_item_result := pg_catalog.jsonb_build_object(
                 'idempotencyKey', v_idempotency_key,
                 'entityType', v_entity_type,
                 'entityId', v_entity_id,
                 'status', 'rejected',
                 'success', false,
                 'error', 'El rol vendedor no tiene privilegios para ejecutar operaciones de borrado',
-                'serverTimestamp', clock_timestamp()
+                'serverTimestamp', pg_catalog.clock_timestamp()
             );
             v_results := v_results || v_item_result;
             CONTINUE;
         END IF;
 
-        -- 3. Verificación de entidades implementadas vs no implementadas
-        -- En H06 sólo sync_test cuenta con persistencia de dominio implementada
+        -- 5.3 Verificación de entidades implementadas vs no implementadas
         IF v_entity_type IN ('ventas', 'pagos_venta', 'movimientos_caja', 'libros', 'ediciones_libro') THEN
             v_failed_count := v_failed_count + 1;
-            v_item_result := jsonb_build_object(
+            v_item_result := pg_catalog.jsonb_build_object(
                 'idempotencyKey', v_idempotency_key,
                 'entityType', v_entity_type,
                 'entityId', v_entity_id,
                 'status', 'rejected',
                 'success', false,
                 'error', 'Entidad aún no implementada en el backend (prevista para H07+): ' || v_entity_type,
-                'serverTimestamp', clock_timestamp()
+                'serverTimestamp', pg_catalog.clock_timestamp()
             );
             v_results := v_results || v_item_result;
             CONTINUE;
         ELSIF v_entity_type <> 'sync_test' THEN
             v_failed_count := v_failed_count + 1;
-            v_item_result := jsonb_build_object(
+            v_item_result := pg_catalog.jsonb_build_object(
                 'idempotencyKey', v_idempotency_key,
                 'entityType', v_entity_type,
                 'entityId', v_entity_id,
                 'status', 'rejected',
                 'success', false,
                 'error', 'Entidad no reconocida en la lista blanca del servidor: ' || v_entity_type,
-                'serverTimestamp', clock_timestamp()
+                'serverTimestamp', pg_catalog.clock_timestamp()
             );
             v_results := v_results || v_item_result;
             CONTINUE;
         END IF;
 
-        -- 4. Deduplicación e Idempotencia atómica contra concurrencia
-        -- Intento de inserción con resolución de conflicto sin excepción
+        -- 5.4 Refuerzo de Idempotencia: verificación de concordancia de parámetros
+        SELECT usuario_id, entity_type, entity_id, operation
+        INTO v_existing_user_id, v_existing_entity_type, v_existing_entity_id, v_existing_operation
+        FROM public.sync_processed_mutations
+        WHERE idempotency_key = v_idempotency_key;
+
+        IF v_existing_user_id IS NOT NULL THEN
+            IF v_existing_user_id <> v_user_id
+               OR v_existing_entity_type <> v_entity_type
+               OR v_existing_entity_id <> v_entity_id
+               OR v_existing_operation <> v_operation
+            THEN
+                v_failed_count := v_failed_count + 1;
+                v_item_result := pg_catalog.jsonb_build_object(
+                    'idempotencyKey', v_idempotency_key,
+                    'entityType', v_entity_type,
+                    'entityId', v_entity_id,
+                    'status', 'rejected',
+                    'success', false,
+                    'error', 'Clave de idempotencia reutilizada con parámetros diferentes (usuario, entidad u operación no coinciden)',
+                    'serverTimestamp', pg_catalog.clock_timestamp()
+                );
+                v_results := v_results || v_item_result;
+                CONTINUE;
+            ELSE
+                v_already_applied_count := v_already_applied_count + 1;
+                v_item_result := pg_catalog.jsonb_build_object(
+                    'idempotencyKey', v_idempotency_key,
+                    'entityType', v_entity_type,
+                    'entityId', v_entity_id,
+                    'status', 'already_applied',
+                    'success', true,
+                    'serverTimestamp', pg_catalog.clock_timestamp()
+                );
+                v_results := v_results || v_item_result;
+                CONTINUE;
+            END IF;
+        END IF;
+
+        -- 5.5 Aplicación de la operación de dominio ('sync_test') con verificación de propiedad y filas afectadas
+        IF v_operation = 'INSERT' THEN
+            SELECT created_by INTO v_record_creator
+            FROM public.sync_test_records
+            WHERE id = v_entity_id;
+
+            IF v_record_creator IS NOT NULL THEN
+                v_failed_count := v_failed_count + 1;
+                v_item_result := pg_catalog.jsonb_build_object(
+                    'idempotencyKey', v_idempotency_key,
+                    'entityType', v_entity_type,
+                    'entityId', v_entity_id,
+                    'status', 'rejected',
+                    'success', false,
+                    'error', 'El registro ya existe con ID: ' || v_entity_id,
+                    'serverTimestamp', pg_catalog.clock_timestamp()
+                );
+                v_results := v_results || v_item_result;
+                CONTINUE;
+            END IF;
+
+            INSERT INTO public.sync_test_records (
+                id, client_id, payload, created_by, created_at, updated_at
+            ) VALUES (
+                v_entity_id, v_dispositivo_id, v_payload, v_user_id,
+                v_client_timestamp, pg_catalog.clock_timestamp()
+            );
+
+            GET DIAGNOSTICS v_rows_affected = ROW_COUNT;
+            IF v_rows_affected = 0 THEN
+                v_failed_count := v_failed_count + 1;
+                v_item_result := pg_catalog.jsonb_build_object(
+                    'idempotencyKey', v_idempotency_key,
+                    'entityType', v_entity_type,
+                    'entityId', v_entity_id,
+                    'status', 'failed',
+                    'success', false,
+                    'error', 'Error al insertar registro (0 filas afectadas)',
+                    'serverTimestamp', pg_catalog.clock_timestamp()
+                );
+                v_results := v_results || v_item_result;
+                CONTINUE;
+            END IF;
+
+        ELSIF v_operation = 'UPDATE' THEN
+            SELECT created_by INTO v_record_creator
+            FROM public.sync_test_records
+            WHERE id = v_entity_id;
+
+            IF v_record_creator IS NULL THEN
+                v_failed_count := v_failed_count + 1;
+                v_item_result := pg_catalog.jsonb_build_object(
+                    'idempotencyKey', v_idempotency_key,
+                    'entityType', v_entity_type,
+                    'entityId', v_entity_id,
+                    'status', 'rejected',
+                    'success', false,
+                    'error', 'Registro no encontrado para actualización (0 filas afectadas)',
+                    'serverTimestamp', pg_catalog.clock_timestamp()
+                );
+                v_results := v_results || v_item_result;
+                CONTINUE;
+            END IF;
+
+            IF v_record_creator <> v_user_id AND v_user_role NOT IN ('dueno', 'administrador') THEN
+                v_failed_count := v_failed_count + 1;
+                v_item_result := pg_catalog.jsonb_build_object(
+                    'idempotencyKey', v_idempotency_key,
+                    'entityType', v_entity_type,
+                    'entityId', v_entity_id,
+                    'status', 'rejected',
+                    'success', false,
+                    'error', 'Permiso denegado: no es propietario del registro que intenta actualizar',
+                    'serverTimestamp', pg_catalog.clock_timestamp()
+                );
+                v_results := v_results || v_item_result;
+                CONTINUE;
+            END IF;
+
+            UPDATE public.sync_test_records
+            SET payload = v_payload,
+                updated_at = pg_catalog.clock_timestamp()
+            WHERE id = v_entity_id;
+
+            GET DIAGNOSTICS v_rows_affected = ROW_COUNT;
+            IF v_rows_affected = 0 THEN
+                v_failed_count := v_failed_count + 1;
+                v_item_result := pg_catalog.jsonb_build_object(
+                    'idempotencyKey', v_idempotency_key,
+                    'entityType', v_entity_type,
+                    'entityId', v_entity_id,
+                    'status', 'failed',
+                    'success', false,
+                    'error', 'Fallo en actualización de registro (0 filas afectadas)',
+                    'serverTimestamp', pg_catalog.clock_timestamp()
+                );
+                v_results := v_results || v_item_result;
+                CONTINUE;
+            END IF;
+
+        ELSIF v_operation = 'DELETE' THEN
+            SELECT created_by INTO v_record_creator
+            FROM public.sync_test_records
+            WHERE id = v_entity_id;
+
+            IF v_record_creator IS NULL THEN
+                v_failed_count := v_failed_count + 1;
+                v_item_result := pg_catalog.jsonb_build_object(
+                    'idempotencyKey', v_idempotency_key,
+                    'entityType', v_entity_type,
+                    'entityId', v_entity_id,
+                    'status', 'rejected',
+                    'success', false,
+                    'error', 'Registro no encontrado para eliminación (0 filas afectadas)',
+                    'serverTimestamp', pg_catalog.clock_timestamp()
+                );
+                v_results := v_results || v_item_result;
+                CONTINUE;
+            END IF;
+
+            IF v_record_creator <> v_user_id AND v_user_role NOT IN ('dueno', 'administrador') THEN
+                v_failed_count := v_failed_count + 1;
+                v_item_result := pg_catalog.jsonb_build_object(
+                    'idempotencyKey', v_idempotency_key,
+                    'entityType', v_entity_type,
+                    'entityId', v_entity_id,
+                    'status', 'rejected',
+                    'success', false,
+                    'error', 'Permiso denegado: no es propietario del registro que intenta eliminar',
+                    'serverTimestamp', pg_catalog.clock_timestamp()
+                );
+                v_results := v_results || v_item_result;
+                CONTINUE;
+            END IF;
+
+            DELETE FROM public.sync_test_records
+            WHERE id = v_entity_id;
+
+            GET DIAGNOSTICS v_rows_affected = ROW_COUNT;
+            IF v_rows_affected = 0 THEN
+                v_failed_count := v_failed_count + 1;
+                v_item_result := pg_catalog.jsonb_build_object(
+                    'idempotencyKey', v_idempotency_key,
+                    'entityType', v_entity_type,
+                    'entityId', v_entity_id,
+                    'status', 'failed',
+                    'success', false,
+                    'error', 'Fallo en eliminación de registro (0 filas afectadas)',
+                    'serverTimestamp', pg_catalog.clock_timestamp()
+                );
+                v_results := v_results || v_item_result;
+                CONTINUE;
+            END IF;
+        END IF;
+
+        -- 5.6 Registro atómico en sync_processed_mutations tras persistencia de dominio confirmada
         INSERT INTO public.sync_processed_mutations (
             idempotency_key,
             dispositivo_id,
@@ -252,60 +482,39 @@ BEGIN
             v_operation,
             'processed',
             v_payload,
-            COALESCE(v_client_timestamp, clock_timestamp())
+            v_client_timestamp
         )
         ON CONFLICT (idempotency_key) DO NOTHING
         RETURNING id INTO v_inserted_id;
 
         IF v_inserted_id IS NULL THEN
-            -- Conflicto: la mutación ya fue procesada anteriormente o por una solicitud concurrente
+            -- Caso de carrera concurrente donde otro worker aplicó la misma mutación exactamente en el mismo instante
             v_already_applied_count := v_already_applied_count + 1;
-            v_item_result := jsonb_build_object(
+            v_item_result := pg_catalog.jsonb_build_object(
                 'idempotencyKey', v_idempotency_key,
                 'entityType', v_entity_type,
                 'entityId', v_entity_id,
                 'status', 'already_applied',
                 'success', true,
-                'serverTimestamp', clock_timestamp()
+                'serverTimestamp', pg_catalog.clock_timestamp()
             );
             v_results := v_results || v_item_result;
             CONTINUE;
         END IF;
 
-        -- 5. Aplicación real de la operación de dominio para entidades implementadas ('sync_test')
-        IF v_operation = 'INSERT' THEN
-            INSERT INTO public.sync_test_records (
-                id, client_id, payload, created_by, created_at, updated_at
-            ) VALUES (
-                v_entity_id, v_dispositivo_id, COALESCE(v_payload, '{}'::JSONB), v_user_id,
-                COALESCE(v_client_timestamp, clock_timestamp()), clock_timestamp()
-            )
-            ON CONFLICT (id) DO UPDATE SET
-                payload = EXCLUDED.payload,
-                updated_at = clock_timestamp();
-        ELSIF v_operation = 'UPDATE' THEN
-            UPDATE public.sync_test_records
-            SET payload = COALESCE(v_payload, '{}'::JSONB),
-                updated_at = clock_timestamp()
-            WHERE id = v_entity_id;
-        ELSIF v_operation = 'DELETE' THEN
-            DELETE FROM public.sync_test_records
-            WHERE id = v_entity_id;
-        END IF;
-
         v_processed_count := v_processed_count + 1;
-        v_item_result := jsonb_build_object(
+        v_item_result := pg_catalog.jsonb_build_object(
             'idempotencyKey', v_idempotency_key,
             'entityType', v_entity_type,
             'entityId', v_entity_id,
             'status', 'processed',
             'success', true,
-            'serverTimestamp', clock_timestamp()
+            'serverTimestamp', pg_catalog.clock_timestamp()
         );
         v_results := v_results || v_item_result;
     END LOOP;
 
-    RETURN jsonb_build_object(
+    RETURN pg_catalog.jsonb_build_object(
         'success', true,
         'processedCount', v_processed_count,
         'alreadyAppliedCount', v_already_applied_count,
@@ -315,6 +524,13 @@ BEGIN
 END;
 $$;
 
--- Revocación de acceso anónimo/público y asignación estricta al rol autenticado
-REVOKE ALL ON FUNCTION public.sync_push_mutations(JSONB) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.sync_push_mutations(JSONB) TO authenticated;
+-- Revocación de acceso anónimo/público y asignación estricta a roles autenticados
+REVOKE ALL ON FUNCTION public.sync_push_mutations(pg_catalog.jsonb) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.sync_push_mutations(pg_catalog.jsonb) FROM anon;
+GRANT EXECUTE ON FUNCTION public.sync_push_mutations(pg_catalog.jsonb) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.sync_push_mutations(pg_catalog.jsonb) TO service_role;
+
+-- Permisos de lectura en tablas bajo RLS
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+GRANT SELECT ON TABLE public.sync_processed_mutations TO authenticated, service_role;
+GRANT SELECT ON TABLE public.sync_test_records TO authenticated, service_role;

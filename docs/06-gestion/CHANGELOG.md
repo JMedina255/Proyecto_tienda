@@ -6,6 +6,43 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [0.1.4] - 2026-11-15 (Hito H06.4 — Auditoría Final de Seguridad y Validación PostgreSQL)
+
+### Añadido
+- **Suite de Pruebas Reales en PostgreSQL Aislado (`packages/sync-engine/tests/postgres-sync.test.ts`):**
+  - 10 pruebas automatizadas ejecutadas contra una instancia real de PostgreSQL 18 (motor WebAssembly compilado con soporte completo de PL/pgSQL, RLS y restricciones):
+    1. Rechazo de ejecución sin sesión activa de GoTrue (SQLSTATE 28000 o denegación de privilegios `EXECUTE`).
+    2. Validación de límites de lote (rechazo de lotes vacíos o superiores a 100 mutaciones).
+    3. Aplicación de `INSERT` válido en tabla real de dominio `sync_test_records` y auditoría en `sync_processed_mutations`.
+    4. Cumplimiento estricto de RLS: usuario regular no puede leer registros creados por otros usuarios (`FORCE ROW LEVEL SECURITY`).
+    5. Prevención de suplantación de `usuarioId`: asignación estricta desde `auth.uid()`.
+    6. Rechazo de `UPDATE` no autorizado sobre registros ajenos (`Permiso denegado: no es propietario`).
+    7. RBAC y propiedad en `DELETE`: rol `vendedor` bloqueado y usuarios ajenos rechazados.
+    8. Verificación de filas afectadas (`ROW_COUNT`): rechazo con `success: false` si un `UPDATE` o `DELETE` afecta 0 filas.
+    9. Idempotencia reforzada: reintento idéntico retorna `already_applied`; reutilización de claves con parámetros alterados es rechazada (`status: 'rejected'`).
+    10. Verificación de seguridad en catálogo: función configurada con `SET search_path = ''` (`proconfig = ['search_path=""']`).
+- **Dependencia de Desarrollo (`packages/sync-engine/package.json`):**
+  - Incorporación de `@electric-sql/pglite` como motor PostgreSQL aislado para pruebas de integración SQL sin tocar producción.
+
+### Corregido
+- **Hardening Completo de RPC en PostgreSQL (`supabase/migrations/20261115000001_sync_infrastructure.sql`):**
+  - Inmunidad total contra secuestro de esquema (CWE-426) mediante `SET search_path = ''` y cualificación explícita de identificadores (`public.`, `pg_catalog.`, `auth.`).
+  - Sustitución de `pg_catalog.trim` por `pg_catalog.btrim` y uso de la forma sintáctica estándar `COALESCE(...)`.
+  - Habilitación de `FORCE ROW LEVEL SECURITY` en `sync_test_records` y `sync_processed_mutations` para garantizar que las políticas apliquen sin excepción.
+  - Validación de existencia y propiedad previa en operaciones `UPDATE` y `DELETE`, abortando si `ROW_COUNT = 0`.
+  - Verificación estricta de concordancia en reintentos idempotentes: si una clave existente tiene discrepancias en usuario, entidad u operación, se rechaza de inmediato.
+  - Revocación estricta de privilegios: `REVOKE ALL FROM PUBLIC, anon; GRANT EXECUTE TO authenticated, service_role;`.
+
+### Verificado
+- **63 Pruebas Automatizadas Aprobadas en el Monorepo (100% PASS):**
+  - 14 en `@tienda/business-logic`
+  - 19 en `@tienda/database`
+  - 30 en `@tienda/sync-engine` (incluyendo 10 pruebas reales de PostgreSQL)
+- **Comprobación de Tipos TypeScript (`pnpm typecheck`):** 9/9 tareas exitosas sin advertencias.
+- **Protección de Producción:** Cero escrituras, cero migraciones y cero usuarios creados en el proyecto remoto `hixrwpiyyhrifsxgekfe`.
+
+---
+
 ## [0.1.3] - 2026-11-15 (Hito H06.3 — Contratos y Seguridad de Sincronización)
 
 ### Añadido

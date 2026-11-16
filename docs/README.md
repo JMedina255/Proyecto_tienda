@@ -20,7 +20,7 @@ Este directorio centraliza la documentación arquitectónica, técnica, de reque
 | `04-seguridad/` | [HARDENING.md](04-seguridad/HARDENING.md) | Línea base de seguridad, RLS, cifrado local (DEC-015), protección de storage, RPCs seguras y controles de sincronización. | **Consolidado y Refinado en H06** |
 | `05-planificacion/` | [PLAN_DESARROLLO.md](05-planificacion/PLAN_DESARROLLO.md) | Cronograma de fases e hitos (H00 a H11), matriz de pruebas, criteria gates y entregables Git. Ubicado en `docs/05-planificacion/`. | **Consolidado y Actualizado en H06** |
 | `06-gestion/` | [DECISIONES.md](06-gestion/DECISIONES.md) | Registro de Decisiones de Arquitectura (ADR) con estados (Confirmado, Propuesto) y clasificación H06. | **Vigente / Actualizado H06** |
-| `06-gestion/` | [CHANGELOG.md](06-gestion/CHANGELOG.md) | Historial de versiones del repositorio documental y técnico. | **Vigente / Versión 0.1.3** |
+| `06-gestion/` | [CHANGELOG.md](06-gestion/CHANGELOG.md) | Historial de versiones del repositorio documental y técnico. | **Vigente / Versión 0.1.4** |
 
 ---
 

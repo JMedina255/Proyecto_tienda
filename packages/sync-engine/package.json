@@ -17,6 +17,7 @@
     "js-sha256": "^1.0.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.16",
     "rimraf": "^6.0.1",
     "typescript": "^5.7.3",
     "vitest": "^3.0.5"
