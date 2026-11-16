@@ -164,6 +164,14 @@ Para cuando se autorice formalmente el despliegue de migraciones hacia el proyec
    FROM information_schema.routine_privileges
    WHERE routine_schema = 'public' AND routine_name = 'sync_push_mutations';
    ```
+5. **Estado de Ejecución y Verificación en Remoto (`hixrwpiyyhrifsxgekfe`):**
+   - **Historial de migraciones:** Aplicada versión `20261115000001` (`sync_infrastructure`).
+   - **Tablas:** `sync_processed_mutations` y `sync_test_records` creadas y vacías (0 filas).
+   - **RLS y Forzado:** Ambas tablas tienen `relrowsecurity = true` y `relforcerowsecurity = true` comprobados en `pg_catalog.pg_class`.
+   - **Índices:** 4 índices explícitos creados (`idx_sync_processed_idempotency` UNIQUE, `idx_sync_processed_device_time`, `idx_sync_processed_entity`, `idx_sync_processed_user`) más 2 índices primarios.
+   - **Políticas RLS:** 6 políticas registradas y activas (4 en `sync_processed_mutations`, 2 en `sync_test_records`).
+   - **Función RPC:** `sync_push_mutations` configurada con `SECURITY DEFINER`, `search_path = ''` y permisos otorgados exclusivamente a `authenticated`, `postgres` y `service_role` (revocados de `PUBLIC` y `anon`).
+   - **Avisos Linter:** 1 aviso de seguridad informativo (ejecución de RPC `SECURITY DEFINER` por `authenticated` — requerida por diseño para el cliente móvil) y avisos de rendimiento sobre `(SELECT auth.uid())` para optimización futura en H10.
 
 ---
 
@@ -174,7 +182,7 @@ Para cuando se autorice formalmente el despliegue de migraciones hacia el proyec
 | `SEC-AUTH-001` | Autenticación GoTrue con JWT y refresh tokens seguros | Suplantación de identidad y secuestro de sesiones operativas | Inspección de configuración GoTrue y expiración de tokens | **Pendiente** |
 | `SEC-AUTH-002` | Persistencia de tokens exclusivamente en Android Keystore | Extracción de tokens en dispositivos sustraídos | Inspección de código (`expo-secure-store`) y ausencia de `AsyncStorage` | **Pendiente** |
 | `SEC-AUTH-003` | Purgado local y revocación remota en cierre de sesión | Reutilización indebida de sesiones inactivas | Prueba de revocación y verificación de purgado en Keystore | **Pendiente** |
-| `SEC-AUTHZ-001` | Activación de RLS en el 100% de tablas PostgreSQL | Fuga de información o mutaciones no autorizadas vía API directa | Script automatizado que audite `relrowsecurity = true` en todas las tablas | **Pendiente** |
+| `SEC-AUTHZ-001` | Activación de RLS en el 100% de tablas PostgreSQL | Fuga de información o mutaciones no autorizadas vía API directa | Verificación remota en `pg_class`: `relrowsecurity = true` y `relforcerowsecurity = true` | **Verificado** |
 | `SEC-AUTHZ-002` | Control de acceso basado en roles (Admin, Dueño, Vendedor) | Escalación de privilegios y operaciones financieras no autorizadas | Pruebas de integración intentando mutaciones restringidas por rol | **Pendiente** |
 | `SEC-AUTHZ-003` | Autorización en dos pasos con PIN para entregas con saldo | Otorgamiento discrecional o fraudulento de crédito (fiado) | Prueba unitaria y de flujo: bloqueo de fiado sin firma de supervisor | **Pendiente** |
 | `SEC-AUTHZ-004` | Autorización offline con caducidad, lista CRL y firma HMAC | Fraude con supervisores dados de baja en terminales desconectados | Prueba de rechazo de autorización con supervisor en lista CRL | **Pendiente** |

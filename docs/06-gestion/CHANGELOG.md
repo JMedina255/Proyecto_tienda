@@ -39,12 +39,14 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
   - 36 en `@tienda/sync-engine` con PostgreSQL TCP 5433 activo (13 en PGlite, 3 de concurrencia multi-conexión TCP en PostgreSQL real, 20 unitarias/simuladas). Total: **69 pruebas ejecutadas y aprobadas**.
   - En ausencia de PostgreSQL TCP local: 66 pruebas ejecutadas y aprobadas, 3 pruebas omitidas explícitamente (`skipped`), 0 pendientes.
 - **Comprobación de Tipos TypeScript (`pnpm typecheck`):** 9/9 tareas exitosas sin errores.
-- **Auditoría Supabase CLI y Base Remota:**
+- **Despliegue y Verificación en Proyecto Remoto Supabase (`hixrwpiyyhrifsxgekfe`):**
   - Versión Supabase CLI: 3.1.0 (`npx supabase --version`).
   - Proyecto vinculado verificado: `hixrwpiyyhrifsxgekfe` (`supabase/config.toml` y `supabase/.temp/project-ref`).
-  - Migraciones remotas existentes: 0 migraciones (`supabase_mcp.list_migrations`).
-  - Tablas públicas remotas existentes: 0 tablas (`supabase_mcp.list_tables`).
-  - Cero escrituras ejecutadas en producción; base remota preservada intacta.
+  - Migración aplicada y confirmada: `20261115000001_sync_infrastructure` (versión `20261115000001` vía `supabase_mcp.list_migrations`).
+  - Tablas creadas: `sync_processed_mutations` y `sync_test_records` (0 filas, RLS habilitado y forzado confirmado en `pg_catalog.pg_class`).
+  - 4 índices explícitos y 6 políticas RLS activas en producción.
+  - RPC `sync_push_mutations`: `SECURITY DEFINER`, `search_path = ''`, permisos revocados de `PUBLIC`/`anon` y otorgados a `authenticated`/`service_role`.
+  - Cero usuarios ficticios, semillas ni mutaciones destructivas en producción.
 
 ---
 
