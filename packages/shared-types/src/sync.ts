@@ -8,13 +8,15 @@ export type SyncOperation = 'INSERT' | 'UPDATE' | 'DELETE';
 
 export type SyncStatus = 'pending' | 'in_progress' | 'synced' | 'failed';
 
+export type MutationSyncStatus = 'processed' | 'already_applied' | 'rejected' | 'failed';
+
 export interface SyncMutation<TPayload = Record<string, unknown>> {
   readonly id: string; // UUID v4 único de la mutación local
-  readonly entityType: string; // ej. 'ventas', 'pagos_venta', 'sesiones_caja', etc.
+  readonly entityType: string; // ej. 'sync_test', 'ventas', 'pagos_venta', etc.
   readonly entityId: string; // UUID de la entidad afectada
   readonly operation: SyncOperation;
   readonly payload: TPayload;
-  readonly idempotencyKey: string; // SHA-256 (dispositivo + entidad + operacion + timestamp)
+  readonly idempotencyKey: string; // SHA-256 (64 hex characters)
   readonly status: SyncStatus;
   readonly retryCount: number;
   readonly lastError: string | null;
@@ -24,20 +26,26 @@ export interface SyncMutation<TPayload = Record<string, unknown>> {
 
 export interface SyncBatchRequest {
   readonly dispositivoId: string;
-  readonly usuarioId: string;
   readonly appVersion: string;
   readonly mutations: readonly SyncMutation[];
+  readonly usuarioId?: string; // Opcional / metadato; el servidor valida y asigna estrictamente auth.uid() de GoTrue
 }
 
 export interface SyncProcessedResult {
   readonly idempotencyKey: string;
-  readonly success: boolean;
+  readonly entityType: string;
+  readonly entityId: string;
+  readonly status: MutationSyncStatus;
+  readonly success: boolean; // true si status es 'processed' o 'already_applied'
   readonly error?: string;
   readonly serverTimestamp: string;
 }
 
 export interface SyncBatchResponse {
+  readonly success: boolean;
   readonly processedCount: number;
+  readonly alreadyAppliedCount: number;
+  readonly failedCount: number;
   readonly results: readonly SyncProcessedResult[];
 }
 

@@ -73,4 +73,32 @@ describe('Adaptador ExpoSqliteDriver (expo-driver.ts)', () => {
     await driver.closeAsync();
     expect(mockDb.closeAsync).toHaveBeenCalled();
   });
+
+  it('serializa escrituras externas impidiendo que se incorporen a una transacción activa', async () => {
+    const events: string[] = [];
+
+    // Iniciamos una transacción que tarda deliberadamente unos ms
+    const txnPromise = driver.withExclusiveTransactionAsync(async (txn) => {
+      events.push('txn_begin');
+      await txn.runAsync('INSERT INTO inside_txn VALUES (1)');
+      events.push('txn_write');
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      events.push('txn_commit');
+    });
+
+    // Lanzamos inmediatamente una escritura externa concurrente vía driver.runAsync
+    const externalPromise = driver.runAsync('INSERT INTO outside_txn VALUES (2)').then(() => {
+      events.push('external_write_done');
+    });
+
+    await Promise.all([txnPromise, externalPromise]);
+
+    // La escritura externa DEBE ejecutarse estrictamente DESPUÉS del commit de la transacción
+    expect(events).toEqual([
+      'txn_begin',
+      'txn_write',
+      'txn_commit',
+      'external_write_done',
+    ]);
+  });
 });

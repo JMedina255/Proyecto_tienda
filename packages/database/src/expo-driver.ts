@@ -34,9 +34,12 @@ class AsyncTransactionMutex {
   }
 }
 
-export class ExpoSqliteDriver implements SqliteDriver {
-  private readonly mutex = new AsyncTransactionMutex();
-
+/**
+ * Contexto de ejecución transaccional directa sobre la conexión principal.
+ * Se utiliza exclusivamente dentro de un callback transaccional protegido por el mutex,
+ * permitiendo ejecutar sentencias DML/DQL sin re-adquirir el mutex para evitar interbloqueos.
+ */
+class ExpoTransactionContextDriver implements SqliteTransactionDriver {
   constructor(private readonly db: ExpoSqliteDatabaseLike) {}
 
   async execAsync(sql: string): Promise<void> {
@@ -58,20 +61,59 @@ export class ExpoSqliteDriver implements SqliteDriver {
   async getAllAsync<T = unknown>(sql: string, ...params: unknown[]): Promise<T[]> {
     return await this.db.getAllAsync<T>(sql, ...params);
   }
+}
+
+export class ExpoSqliteDriver implements SqliteDriver {
+  private readonly mutex = new AsyncTransactionMutex();
+
+  constructor(private readonly db: ExpoSqliteDatabaseLike) {}
+
+  /**
+   * Ejecuta sentencias DDL o scripts protegiéndolos mediante el mutex,
+   * impidiendo que escrituras externas se intercalen dentro de una transacción activa.
+   */
+  async execAsync(sql: string): Promise<void> {
+    await this.mutex.runExclusive(async () => {
+      await this.db.execAsync(sql);
+    });
+  }
+
+  /**
+   * Ejecuta sentencias DML adquiriendo el mutex para evitar que escrituras aisladas
+   * se incorporen accidentalmente a una transacción abierta por otro flujo.
+   */
+  async runAsync(sql: string, ...params: unknown[]): Promise<RunResult> {
+    return await this.mutex.runExclusive(async () => {
+      const result = await this.db.runAsync(sql, ...params);
+      return {
+        lastInsertRowId: result.lastInsertRowId,
+        changes: result.changes,
+      };
+    });
+  }
+
+  async getFirstAsync<T = unknown>(sql: string, ...params: unknown[]): Promise<T | null> {
+    return await this.db.getFirstAsync<T>(sql, ...params);
+  }
+
+  async getAllAsync<T = unknown>(sql: string, ...params: unknown[]): Promise<T[]> {
+    return await this.db.getAllAsync<T>(sql, ...params);
+  }
 
   async withTransactionAsync<T = void>(task: (txn: SqliteTransactionDriver) => Promise<T>): Promise<T> {
     return await this.mutex.runExclusive(async () => {
+      const txn = new ExpoTransactionContextDriver(this.db);
       if (typeof this.db.withTransactionAsync === 'function') {
         let result: T | undefined;
         await this.db.withTransactionAsync(async () => {
-          result = await task(this);
+          result = await task(txn);
         });
         return result as T;
       }
 
       await this.db.execAsync('BEGIN;');
       try {
-        const result = await task(this);
+        const result = await task(txn);
         await this.db.execAsync('COMMIT;');
         return result;
       } catch (err) {
@@ -87,14 +129,15 @@ export class ExpoSqliteDriver implements SqliteDriver {
 
   async withExclusiveTransactionAsync<T = void>(task: (txn: SqliteTransactionDriver) => Promise<T>): Promise<T> {
     return await this.mutex.runExclusive(async () => {
+      const txn = new ExpoTransactionContextDriver(this.db);
       // Ejecución de BEGIN IMMEDIATE sobre la conexión principal serializada.
       // Garantiza:
       // 1. Integridad referencial estricta: PRAGMA foreign_keys = ON se mantiene activo.
       // 2. Atomicidad financiera: commit o rollback coordinado de todas las operaciones.
-      // 3. Bloqueo inmediato de escritura sin subconexiones aisladas de Expo.
+      // 3. Aislamiento total: cualquier escritura externa vía driver.runAsync espera la liberación del mutex.
       await this.db.execAsync('BEGIN IMMEDIATE;');
       try {
-        const result = await task(this);
+        const result = await task(txn);
         await this.db.execAsync('COMMIT;');
         return result;
       } catch (err) {

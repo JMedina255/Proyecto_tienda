@@ -46,20 +46,46 @@ export class SimulatedSupabaseRpcClient implements SupabaseSyncClient {
 
     const results: SyncProcessedResult[] = [];
     const serverTimestamp = new Date().toISOString();
+    let processedCount = 0;
+    let alreadyAppliedCount = 0;
+    let failedCount = 0;
 
     for (const mutation of request.mutations) {
-      if (this.processedKeys.has(mutation.idempotencyKey)) {
-        // Idempotencia: el servidor detecta que ya fue procesada y responde éxito sin duplicar
+      // 1. Rechazo explícito de entidades de negocio no implementadas todavía en H06
+      if (mutation.entityType !== 'sync_test') {
+        failedCount++;
         results.push({
           idempotencyKey: mutation.idempotencyKey,
+          entityType: mutation.entityType,
+          entityId: mutation.entityId,
+          status: 'rejected',
+          success: false,
+          error: `Entidad aún no implementada en el servidor (planeada para H07+): ${mutation.entityType}`,
+          serverTimestamp,
+        });
+        continue;
+      }
+
+      // 2. Reintento idempotente: ya procesada con anterioridad
+      if (this.processedKeys.has(mutation.idempotencyKey)) {
+        alreadyAppliedCount++;
+        results.push({
+          idempotencyKey: mutation.idempotencyKey,
+          entityType: mutation.entityType,
+          entityId: mutation.entityId,
+          status: 'already_applied',
           success: true,
           serverTimestamp,
         });
       } else {
-        // Procesamiento exitoso
+        // 3. Procesamiento y persistencia exitosa
         this.processedKeys.add(mutation.idempotencyKey);
+        processedCount++;
         results.push({
           idempotencyKey: mutation.idempotencyKey,
+          entityType: mutation.entityType,
+          entityId: mutation.entityId,
+          status: 'processed',
           success: true,
           serverTimestamp,
         });
@@ -67,7 +93,10 @@ export class SimulatedSupabaseRpcClient implements SupabaseSyncClient {
     }
 
     return {
-      processedCount: results.filter((r) => r.success).length,
+      success: true,
+      processedCount,
+      alreadyAppliedCount,
+      failedCount,
       results,
     };
   }

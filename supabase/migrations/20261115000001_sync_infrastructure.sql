@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS public.sync_processed_mutations (
     entity_type TEXT NOT NULL,
     entity_id TEXT NOT NULL,
     operation TEXT NOT NULL CHECK (operation IN ('INSERT', 'UPDATE', 'DELETE')),
-    status TEXT NOT NULL DEFAULT 'processed' CHECK (status IN ('processed', 'failed', 'already_applied')),
+    status TEXT NOT NULL DEFAULT 'processed' CHECK (status IN ('processed', 'failed', 'already_applied', 'rejected')),
     payload JSONB,
     server_timestamp TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
     client_timestamp TIMESTAMPTZ NOT NULL,
@@ -33,10 +33,22 @@ CREATE INDEX IF NOT EXISTS idx_sync_processed_entity
 CREATE INDEX IF NOT EXISTS idx_sync_processed_user
     ON public.sync_processed_mutations (usuario_id);
 
--- 2. Habilitación obligatoria de Row Level Security (RLS)
-ALTER TABLE public.sync_processed_mutations ENABLE ROW LEVEL SECURITY;
+-- 2. Tabla real de prueba para sincronización en H06
+-- Permite verificar que las operaciones aplican cambios reales en tablas de dominio
+CREATE TABLE IF NOT EXISTS public.sync_test_records (
+    id TEXT PRIMARY KEY,
+    client_id TEXT NOT NULL,
+    payload JSONB NOT NULL,
+    created_by UUID NOT NULL REFERENCES auth.users(id) ON DELETE RESTRICT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+);
 
--- Política de lectura: los operadores ven sus propias mutaciones; dueños y administradores ven todo
+-- 3. Habilitación obligatoria de Row Level Security (RLS)
+ALTER TABLE public.sync_processed_mutations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sync_test_records ENABLE ROW LEVEL SECURITY;
+
+-- Políticas de lectura en sync_processed_mutations
 DROP POLICY IF EXISTS "sync_processed_select_policy" ON public.sync_processed_mutations;
 CREATE POLICY "sync_processed_select_policy" ON public.sync_processed_mutations
     FOR SELECT
@@ -65,13 +77,29 @@ CREATE POLICY "no_direct_client_delete" ON public.sync_processed_mutations
     TO authenticated
     USING (false);
 
--- 3. Función RPC transaccional segura para recepción y deduplicación de mutaciones
+-- Políticas en sync_test_records
+DROP POLICY IF EXISTS "sync_test_records_select_policy" ON public.sync_test_records;
+CREATE POLICY "sync_test_records_select_policy" ON public.sync_test_records
+    FOR SELECT
+    TO authenticated
+    USING (true);
+
+DROP POLICY IF EXISTS "sync_test_records_direct_block" ON public.sync_test_records;
+CREATE POLICY "sync_test_records_direct_block" ON public.sync_test_records
+    FOR ALL
+    TO authenticated
+    USING (false)
+    WITH CHECK (false);
+
+-- 4. Función RPC transaccional segura para recepción, aplicación y deduplicación de mutaciones
 -- Reglas críticas:
 -- - Cero SQL dinámico (no evalúa código arbitrario ni concatena identificadores).
--- - Lista blanca estricta de entidades admitidas.
+-- - Soporta argumento p_batch como objeto SyncBatchRequest {"dispositivoId", "appVersion", "mutations"} o array.
 -- - La identidad del usuario (usuario_id) se extrae del token GoTrue (auth.uid()), NUNCA del cliente.
 -- - El rol se valida desde auth.jwt() -> 'app_metadata' ->> 'role'.
-CREATE OR REPLACE FUNCTION public.sync_push_mutations(p_mutations JSONB)
+-- - Aplica realmente la operación de dominio en una sola transacción o rechaza si no está implementada.
+-- - Resuelve concurrencia mediante INSERT ON CONFLICT DO NOTHING a nivel de índice atómico.
+CREATE OR REPLACE FUNCTION public.sync_push_mutations(p_batch JSONB)
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -80,6 +108,8 @@ AS $$
 DECLARE
     v_user_id UUID;
     v_user_role TEXT;
+    v_mutations JSONB;
+    v_batch_device_id TEXT := 'desconocido';
     v_mutation JSONB;
     v_idempotency_key TEXT;
     v_dispositivo_id TEXT;
@@ -92,7 +122,7 @@ DECLARE
     v_already_applied_count INT := 0;
     v_failed_count INT := 0;
     v_results JSONB := '[]'::JSONB;
-    v_existing_id UUID;
+    v_inserted_id UUID;
     v_item_result JSONB;
 BEGIN
     -- Verificación mandatoria de sesión autenticada
@@ -105,17 +135,31 @@ BEGIN
     -- Obtención segura del rol desde los claims del servidor
     v_user_role := COALESCE(auth.jwt() -> 'app_metadata' ->> 'role', 'vendedor');
 
-    -- Validación del formato del argumento
-    IF p_mutations IS NULL OR jsonb_typeof(p_mutations) <> 'array' THEN
-        RAISE EXCEPTION 'El argumento p_mutations debe ser un arreglo JSONB'
+    -- Validación y normalización del argumento de entrada (objeto SyncBatchRequest o arreglo de mutaciones)
+    IF p_batch IS NULL THEN
+        RAISE EXCEPTION 'El argumento p_batch no puede ser nulo'
+            USING ERRCODE = '22023';
+    END IF;
+
+    IF jsonb_typeof(p_batch) = 'array' THEN
+        v_mutations := p_batch;
+    ELSIF jsonb_typeof(p_batch) = 'object' THEN
+        v_batch_device_id := COALESCE(p_batch ->> 'dispositivoId', 'desconocido');
+        v_mutations := p_batch -> 'mutations';
+        IF v_mutations IS NULL OR jsonb_typeof(v_mutations) <> 'array' THEN
+            RAISE EXCEPTION 'El campo mutations de p_batch debe ser un arreglo JSONB'
+                USING ERRCODE = '22023';
+        END IF;
+    ELSE
+        RAISE EXCEPTION 'El argumento p_batch debe ser un objeto o arreglo JSONB'
             USING ERRCODE = '22023';
     END IF;
 
     -- Procesamiento de cada mutación en el lote
-    FOR v_mutation IN SELECT * FROM jsonb_array_elements(p_mutations)
+    FOR v_mutation IN SELECT * FROM jsonb_array_elements(v_mutations)
     LOOP
         v_idempotency_key := v_mutation ->> 'idempotencyKey';
-        v_dispositivo_id := v_mutation ->> 'dispositivoId';
+        v_dispositivo_id := COALESCE(v_mutation ->> 'dispositivoId', v_batch_device_id);
         v_entity_type := v_mutation ->> 'entityType';
         v_entity_id := v_mutation ->> 'entityId';
         v_operation := v_mutation ->> 'operation';
@@ -130,57 +174,65 @@ BEGIN
             v_failed_count := v_failed_count + 1;
             v_item_result := jsonb_build_object(
                 'idempotencyKey', COALESCE(v_idempotency_key, 'unknown'),
+                'entityType', COALESCE(v_entity_type, 'unknown'),
+                'entityId', COALESCE(v_entity_id, 'unknown'),
                 'status', 'failed',
-                'error', 'Parámetros de mutación inválidos o incompletos'
+                'success', false,
+                'error', 'Parámetros de mutación inválidos o incompletos',
+                'serverTimestamp', clock_timestamp()
             );
             v_results := v_results || v_item_result;
             CONTINUE;
         END IF;
 
-        -- 2. Lista blanca estricta de entidades permitidas (Protección anti-SQL injection)
-        -- En esta fase inicial se admiten entidades base de sincronización y pruebas
-        IF v_entity_type NOT IN ('sync_test', 'ventas', 'pagos_venta', 'movimientos_caja', 'libros', 'ediciones_libro') THEN
-            v_failed_count := v_failed_count + 1;
-            v_item_result := jsonb_build_object(
-                'idempotencyKey', v_idempotency_key,
-                'status', 'failed',
-                'error', 'Entidad no reconocida en la lista blanca del servidor: ' || v_entity_type
-            );
-            v_results := v_results || v_item_result;
-            CONTINUE;
-        END IF;
-
-        -- 3. Control de permisos según el rol del usuario autenticado
+        -- 2. Control de permisos según el rol del usuario autenticado (RBAC)
         IF v_user_role = 'vendedor' AND v_operation = 'DELETE' THEN
             v_failed_count := v_failed_count + 1;
             v_item_result := jsonb_build_object(
                 'idempotencyKey', v_idempotency_key,
-                'status', 'failed',
-                'error', 'El rol vendedor no tiene privilegios para ejecutar operaciones de borrado'
+                'entityType', v_entity_type,
+                'entityId', v_entity_id,
+                'status', 'rejected',
+                'success', false,
+                'error', 'El rol vendedor no tiene privilegios para ejecutar operaciones de borrado',
+                'serverTimestamp', clock_timestamp()
             );
             v_results := v_results || v_item_result;
             CONTINUE;
         END IF;
 
-        -- 4. Deduplicación e Idempotencia: Verificar si la clave ya fue registrada
-        SELECT id INTO v_existing_id
-        FROM public.sync_processed_mutations
-        WHERE idempotency_key = v_idempotency_key;
-
-        IF FOUND THEN
-            v_already_applied_count := v_already_applied_count + 1;
+        -- 3. Verificación de entidades implementadas vs no implementadas
+        -- En H06 sólo sync_test cuenta con persistencia de dominio implementada
+        IF v_entity_type IN ('ventas', 'pagos_venta', 'movimientos_caja', 'libros', 'ediciones_libro') THEN
+            v_failed_count := v_failed_count + 1;
             v_item_result := jsonb_build_object(
                 'idempotencyKey', v_idempotency_key,
                 'entityType', v_entity_type,
                 'entityId', v_entity_id,
-                'status', 'already_applied'
+                'status', 'rejected',
+                'success', false,
+                'error', 'Entidad aún no implementada en el backend (prevista para H07+): ' || v_entity_type,
+                'serverTimestamp', clock_timestamp()
+            );
+            v_results := v_results || v_item_result;
+            CONTINUE;
+        ELSIF v_entity_type <> 'sync_test' THEN
+            v_failed_count := v_failed_count + 1;
+            v_item_result := jsonb_build_object(
+                'idempotencyKey', v_idempotency_key,
+                'entityType', v_entity_type,
+                'entityId', v_entity_id,
+                'status', 'rejected',
+                'success', false,
+                'error', 'Entidad no reconocida en la lista blanca del servidor: ' || v_entity_type,
+                'serverTimestamp', clock_timestamp()
             );
             v_results := v_results || v_item_result;
             CONTINUE;
         END IF;
 
-        -- 5. Registro transaccional seguro de la mutación procesada
-        -- El usuario_id asignado es forzosamente v_user_id (GoTrue)
+        -- 4. Deduplicación e Idempotencia atómica contra concurrencia
+        -- Intento de inserción con resolución de conflicto sin excepción
         INSERT INTO public.sync_processed_mutations (
             idempotency_key,
             dispositivo_id,
@@ -193,7 +245,7 @@ BEGIN
             client_timestamp
         ) VALUES (
             v_idempotency_key,
-            COALESCE(v_dispositivo_id, 'desconocido'),
+            v_dispositivo_id,
             v_user_id,
             v_entity_type,
             v_entity_id,
@@ -201,28 +253,68 @@ BEGIN
             'processed',
             v_payload,
             COALESCE(v_client_timestamp, clock_timestamp())
-        );
+        )
+        ON CONFLICT (idempotency_key) DO NOTHING
+        RETURNING id INTO v_inserted_id;
+
+        IF v_inserted_id IS NULL THEN
+            -- Conflicto: la mutación ya fue procesada anteriormente o por una solicitud concurrente
+            v_already_applied_count := v_already_applied_count + 1;
+            v_item_result := jsonb_build_object(
+                'idempotencyKey', v_idempotency_key,
+                'entityType', v_entity_type,
+                'entityId', v_entity_id,
+                'status', 'already_applied',
+                'success', true,
+                'serverTimestamp', clock_timestamp()
+            );
+            v_results := v_results || v_item_result;
+            CONTINUE;
+        END IF;
+
+        -- 5. Aplicación real de la operación de dominio para entidades implementadas ('sync_test')
+        IF v_operation = 'INSERT' THEN
+            INSERT INTO public.sync_test_records (
+                id, client_id, payload, created_by, created_at, updated_at
+            ) VALUES (
+                v_entity_id, v_dispositivo_id, COALESCE(v_payload, '{}'::JSONB), v_user_id,
+                COALESCE(v_client_timestamp, clock_timestamp()), clock_timestamp()
+            )
+            ON CONFLICT (id) DO UPDATE SET
+                payload = EXCLUDED.payload,
+                updated_at = clock_timestamp();
+        ELSIF v_operation = 'UPDATE' THEN
+            UPDATE public.sync_test_records
+            SET payload = COALESCE(v_payload, '{}'::JSONB),
+                updated_at = clock_timestamp()
+            WHERE id = v_entity_id;
+        ELSIF v_operation = 'DELETE' THEN
+            DELETE FROM public.sync_test_records
+            WHERE id = v_entity_id;
+        END IF;
 
         v_processed_count := v_processed_count + 1;
         v_item_result := jsonb_build_object(
             'idempotencyKey', v_idempotency_key,
             'entityType', v_entity_type,
             'entityId', v_entity_id,
-            'status', 'processed'
+            'status', 'processed',
+            'success', true,
+            'serverTimestamp', clock_timestamp()
         );
         v_results := v_results || v_item_result;
     END LOOP;
 
     RETURN jsonb_build_object(
         'success', true,
-        'processed', v_processed_count,
-        'alreadyApplied', v_already_applied_count,
-        'failed', v_failed_count,
+        'processedCount', v_processed_count,
+        'alreadyAppliedCount', v_already_applied_count,
+        'failedCount', v_failed_count,
         'results', v_results
     );
 END;
 $$;
 
--- Revocación de acceso anónimo/público y asignación a rol autenticado
+-- Revocación de acceso anónimo/público y asignación estricta al rol autenticado
 REVOKE ALL ON FUNCTION public.sync_push_mutations(JSONB) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.sync_push_mutations(JSONB) TO authenticated;

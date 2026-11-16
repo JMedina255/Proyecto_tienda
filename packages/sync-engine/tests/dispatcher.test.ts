@@ -32,12 +32,12 @@ describe('Despachador de Sincronización Outbox (SyncDispatcher)', () => {
     await db.closeAsync();
   });
 
-  const createSampleMutation = (id: string, entityId: string): SyncMutation => {
+  const createSampleMutation = (id: string, entityId: string, entityType = 'sync_test'): SyncMutation => {
     const timestamp = new Date().toISOString();
     const payload = { test: true, entityId };
     const idempotencyKey = generateIdempotencyKey({
       dispositivoId: config.dispositivoId,
-      entityType: 'ventas',
+      entityType,
       entityId,
       operation: 'INSERT',
       timestamp,
@@ -46,7 +46,7 @@ describe('Despachador de Sincronización Outbox (SyncDispatcher)', () => {
 
     return {
       id,
-      entityType: 'ventas',
+      entityType,
       entityId,
       operation: 'INSERT',
       payload,
@@ -124,7 +124,68 @@ describe('Despachador de Sincronización Outbox (SyncDispatcher)', () => {
       mutations: [mut],
     });
 
-    expect(pushAgain.processedCount).toBe(1);
+    expect(pushAgain.processedCount).toBe(0);
+    expect(pushAgain.alreadyAppliedCount).toBe(1);
     expect(pushAgain.results[0]?.success).toBe(true);
+    expect(pushAgain.results[0]?.status).toBe('already_applied');
+  });
+
+  it('no marca como synced una mutación rechazada por el servidor (sin confirmación falsa)', async () => {
+    // Entidad 'ventas' aún no implementada en H06
+    const mutVenta = createSampleMutation('mut-unimplemented', 'vta-01', 'ventas');
+    await outboxRepo.enqueue(mutVenta);
+
+    const result = await dispatcher.dispatchPending();
+    expect(result.processed).toBe(0);
+    expect(result.failed).toBe(1);
+
+    // La mutación local NO fue marcada como synced; se marcó como failed con error
+    const pending = await outboxRepo.getPending();
+    expect(pending.length).toBe(1);
+    expect(pending[0]?.status).toBe('pending');
+    expect(pending[0]?.retryCount).toBe(1);
+    expect(pending[0]?.lastError).toContain('Entidad aún no implementada');
+  });
+
+  it('recupera mutaciones si el servidor retorna una respuesta incompleta', async () => {
+    const mut1 = createSampleMutation('mut-resp-1', 'ent-resp-1');
+    const mut2 = createSampleMutation('mut-resp-2', 'ent-resp-2');
+    await outboxRepo.enqueue(mut1);
+    await outboxRepo.enqueue(mut2);
+
+    // Cliente RPC mock que omite deliberadamente la segunda mutación en la respuesta
+    const partialRpcClient: typeof rpcClient = {
+      ...rpcClient,
+      async pushMutations() {
+        return {
+          success: true,
+          processedCount: 1,
+          alreadyAppliedCount: 0,
+          failedCount: 0,
+          results: [
+            {
+              idempotencyKey: mut1.idempotencyKey,
+              entityType: mut1.entityType,
+              entityId: mut1.entityId,
+              status: 'processed',
+              success: true,
+              serverTimestamp: new Date().toISOString(),
+            },
+            // mut2 omitida deliberadamente
+          ],
+        };
+      },
+    };
+
+    const partialDispatcher = new SyncDispatcher(outboxRepo, partialRpcClient, config);
+    const result = await partialDispatcher.dispatchPending();
+
+    expect(result.processed).toBe(1);
+    expect(result.failed).toBe(1); // La mutación omitida se marca como failed para reintento
+
+    const pending = await outboxRepo.getPending();
+    expect(pending.length).toBe(1);
+    expect(pending[0]?.id).toBe('mut-resp-2');
+    expect(pending[0]?.lastError).toContain('Respuesta incompleta');
   });
 });

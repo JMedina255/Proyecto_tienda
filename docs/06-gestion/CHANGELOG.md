@@ -6,6 +6,50 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [0.1.3] - 2026-11-15 (Hito H06.3 — Contratos y Seguridad de Sincronización)
+
+### Añadido
+- **Unificación de Contratos de Sincronización (`packages/shared-types/src/sync.ts` y `src/rpc.ts`):**
+  - Estandarización de `SyncBatchRequest` con soporte para objeto `{ dispositivoId, appVersion, mutations, usuarioId? }` y array de mutaciones.
+  - Estandarización de `SyncBatchResponse` (`success`, `processedCount`, `alreadyAppliedCount`, `failedCount`, `results`) y `SyncProcessedResult` (`idempotencyKey`, `entityType`, `entityId`, `status: MutationSyncStatus`, `success: boolean`, `error?`, `serverTimestamp`).
+  - Tipo discriminado `MutationSyncStatus = 'processed' | 'already_applied' | 'rejected' | 'failed'`.
+- **Suite de Pruebas de Seguridad y Contratos RPC (`packages/sync-engine/tests/rpc-security.test.ts`):**
+  - 8 pruebas de validación automatizada:
+    1. Contrato cliente-servidor compatible (`SyncBatchRequest` y `SyncBatchResponse`).
+    2. Mutación válida aplicada y registrada en `sync_processed_mutations`.
+    3. Reintento idempotente que retorna `already_applied` con `success: true`.
+    4. Concurrencia atómica de claves de idempotencia (`ON CONFLICT (idempotency_key) DO NOTHING`).
+    5. Rechazo inmediato de usuario no autenticado o suplantación de `usuario_id`.
+    6. Rechazo explícito de entidades no implementadas (hoja de ruta H07+) con `status: 'rejected'` y `success: false`.
+    7. Fallo en persistencia sin falsas confirmaciones (el cliente marca `failed`, nunca `synced`).
+    8. Recuperación ante respuestas incompletas de lotes (mutaciones omitidas marcadas como `failed` para reintento).
+- **Aislamiento Estricto de Transacciones en SQLite (`packages/database/src/expo-driver.ts`):**
+  - `ExpoTransactionContextDriver` que ejecuta operaciones transaccionales bajo el contexto directo de la transacción mientras bloquea y serializa llamadas concurrentes a `driver.execAsync` y `driver.runAsync` mediante `this.mutex.runExclusive`.
+  - Prueba de concurrencia y serialización añadida en `packages/database/tests/expo-driver.test.ts`.
+
+### Corregido
+- **Prevención de Falsa Confirmación en Cliente (`packages/sync-engine/src/dispatcher.ts`):**
+  - El cliente solo marca como `synced` si `result.success === true` y su estado es `'processed'` o `'already_applied'`.
+  - Rechazos del servidor o errores de negocio marcan la mutación como `failed` con su causa, evitando borrado o confirmación ilegítima en el Outbox local.
+  - Respuestas de lote incompletas (omisiones) son detectadas y marcadas como `failed` para evitar que queden atascadas en `in_progress`.
+- **Función RPC de PostgreSQL Idempotente y Transaccional (`supabase/migrations/20261115000001_sync_infrastructure.sql`):**
+  - Creación de tabla real de dominio `public.sync_test_records` para pruebas de integración de sincronización con RLS.
+  - Manejo atómico de concurrencia mediante `INSERT ... ON CONFLICT (idempotency_key) DO NOTHING RETURNING id INTO v_inserted_id` en una única transacción sin bloqueos de aplicación.
+  - Persistencia de registros de dominio y auditoría en `sync_processed_mutations` atómica (ambos o ninguno).
+  - Rechazo explícito de entidades no implementadas (`ventas`, `pagos_venta`, `movimientos_caja`, etc.) con mensaje claro de hoja de ruta futura (H07+).
+  - Eliminación de SQL dinámico (`EXECUTE`), validación estricta de esquema y tipos, anti-spoofing con `auth.uid()` y restricción de perfiles (el rol `vendedor` no puede invocar mutaciones `DELETE`).
+
+### Verificado
+- **53 Pruebas Automatizadas Aprobadas en el Monorepo (100% PASS):**
+  - 14 en `@tienda/business-logic`
+  - 19 en `@tienda/database`
+  - 20 en `@tienda/sync-engine`
+- **Comprobación de Tipos TypeScript (`pnpm typecheck`):** 9/9 tareas exitosas sin advertencias.
+- **Higiene de Seguridad:** Cero secretos, tokens o credenciales en el repositorio.
+- **Integración Supabase:** Migración local preparada en `supabase/migrations/`; proyecto remoto `hixrwpiyyhrifsxgekfe` preservado intacto (modo read-only sin escrituras no autorizadas).
+
+---
+
 ## [0.1.2] - 2026-11-15 (Hito H06.2 — Corrección Transaccional y Preparación de Supabase)
 
 ### Añadido

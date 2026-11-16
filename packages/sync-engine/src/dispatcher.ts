@@ -46,18 +46,33 @@ export class SyncDispatcher {
 
       let processed = 0;
       let failed = 0;
+      const handledIds = new Set<string>();
 
       for (const result of response.results) {
         const mutation = pendingMutations.find((m) => m.idempotencyKey === result.idempotencyKey);
         if (!mutation) continue;
+        handledIds.add(mutation.id);
 
-        if (result.success) {
+        if (result.success && (result.status === 'processed' || result.status === 'already_applied')) {
           await this.outboxRepo.markSynced([mutation.id]);
           processed++;
         } else {
-          await this.outboxRepo.markFailed(mutation.id, result.error || 'Error desconocido reportado por RPC');
+          await this.outboxRepo.markFailed(
+            mutation.id,
+            result.error || `Mutación rechazada por el servidor con estado: ${result.status}`,
+          );
           failed++;
         }
+      }
+
+      // Protección contra respuestas incompletas: mutaciones no informadas por el servidor
+      const unhandled = pendingMutations.filter((m) => !handledIds.has(m.id));
+      for (const unhandledMutation of unhandled) {
+        await this.outboxRepo.markFailed(
+          unhandledMutation.id,
+          'Respuesta incompleta: la mutación enviada no fue incluida en el resultado del servidor',
+        );
+        failed++;
       }
 
       return { processed, failed };

@@ -165,9 +165,9 @@ Toda la documentación técnica y de gestión del proyecto reside en el director
 | Parámetro | Estado |
 | :--- | :--- |
 | **Fase actual** | Fase 2 — Construcción Incremental |
-| **Hito completado recientemente** | **H06.2 — Atomicidad SQLite y preparación de Supabase** |
-| **Hitos cerrados** | **H00** (Inicialización), **H00.1** (Auditoría), **H00.2** (Git y versionado), **H01** (SRS y reglas), **H01.1** (Simplificación y normalización), **H02** (Arquitectura), **H02.1** (Correcciones críticas), **H03** (Modelo y diccionario), **H04** (Estándares y hardening), **H05** (Planificación y pruebas), **H06** (Monorepo base), **H06.1** (Estabilización Android), **H06.2** (Atomicidad SQLite y Supabase) |
+| **Hito completado recientemente** | **H06.3 — Corrección y validación de sincronización Supabase** |
+| **Hitos cerrados** | **H00** (Inicialización), **H00.1** (Auditoría), **H00.2** (Git y versionado), **H01** (SRS y reglas), **H01.1** (Simplificación y normalización), **H02** (Arquitectura), **H02.1** (Correcciones críticas), **H03** (Modelo y diccionario), **H04** (Estándares y hardening), **H05** (Planificación y pruebas), **H06** (Monorepo base), **H06.1** (Estabilización Android), **H06.2** (Atomicidad SQLite y Supabase), **H06.3** (Contratos y seguridad sync) |
 | **Repositorio remoto** | [https://github.com/JMedina255/Proyecto_tienda.git](https://github.com/JMedina255/Proyecto_tienda) (rama `master`) |
-| **Código fuente** | Monorepo estabilizado, SQLite nativo con WAL y durabilidad FULL, `AsyncTransactionMutex` con `BEGIN IMMEDIATE;`, enforcement estricto de claves foráneas y Outbox atómico comprobados al 100% en Android Pixel 8 (6 pruebas en vivo PASS), 47 pruebas automatizadas aprobadas |
-| **Servicios externos** | Infraestructura local de Supabase preparada (`config.toml`, migración `sync_processed_mutations` y RPC segura `sync_push_mutations`). Proyecto remoto `hixrwpiyyhrifsxgekfe` preservado en modo read-only |
+| **Código fuente** | Monorepo estabilizado, persistencia SQLite con WAL y durabilidad FULL, `AsyncTransactionMutex` con `BEGIN IMMEDIATE;`, contratos unificados de sincronización (`SyncBatchRequest` / `SyncBatchResponse`), prevención de falsas confirmaciones y 53 pruebas automatizadas aprobadas (100% PASS) |
+| **Servicios externos** | Infraestructura local de Supabase preparada (`config.toml`, migración `sync_processed_mutations`, tabla `sync_test_records` y RPC atómica `sync_push_mutations` con RLS y manejo de concurrencia). Proyecto remoto `hixrwpiyyhrifsxgekfe` preservado en modo read-only |
 | **Próximo hito** | **H07:** Catálogo bibliográfico, categorías, ediciones y captura asistida por OCR on-device |
